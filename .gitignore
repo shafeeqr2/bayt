@@ -1,0 +1,10 @@
+.env
+.DS_Store
+
+# Raw Apify exports and downloaded photos. The seed the app uses lives in
+# backend/seed/ and is committed.
+data/
+
+__pycache__/
+*.pyc
+.venv/
