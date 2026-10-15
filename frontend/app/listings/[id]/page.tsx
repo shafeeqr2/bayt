@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 
 import { getListing } from "@/lib/api";
 import { formatPrice, formatSqft } from "@/lib/format";
+import { CitySection } from "./city-section";
 import { Gallery } from "./gallery";
 
 export default async function ListingPage({ params }: PageProps<"/listings/[id]">) {
@@ -12,7 +14,8 @@ export default async function ListingPage({ params }: PageProps<"/listings/[id]"
 
   const bedrooms =
     listing.bedrooms_below
-      ? `${listing.bedrooms_above} + ${listing.bedrooms_below} below grade`
+      ? // TRREB's "+1" is an extra room: usually a den in condos, a basement bedroom in houses.
+        `${listing.bedrooms_above} + ${listing.bedrooms_below} (${listing.building_type === "Apartment" ? "den" : "basement or den"})`
       : listing.bedrooms_text;
 
   const facts: [string, string | number | null][] = [
@@ -40,7 +43,7 @@ export default async function ListingPage({ params }: PageProps<"/listings/[id]"
       </Link>
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-        <Gallery photos={listing.photos.map((p) => p.high)} alt={listing.address ?? "Listing"} />
+        <Gallery photos={listing.photos} alt={listing.address ?? "Listing"} />
 
         <div className="space-y-6">
           <div className="space-y-1">
@@ -76,14 +79,20 @@ export default async function ListingPage({ params }: PageProps<"/listings/[id]"
       </div>
 
       {listing.description && (
-        <section className="max-w-3xl space-y-2">
+        <section className="max-w-4xl space-y-2">
           <h2 className="text-lg font-semibold">About this home</h2>
           <p className="whitespace-pre-line leading-relaxed text-foreground/90">{listing.description}</p>
         </section>
       )}
 
+      <div className="max-w-4xl">
+        <Suspense fallback={<div className="h-64 animate-pulse rounded-xl bg-border" />}>
+          <CitySection id={listing.id} />
+        </Suspense>
+      </div>
+
       {listing.rooms.length > 0 && (
-        <section className="max-w-3xl space-y-2">
+        <section className="max-w-4xl space-y-2">
           <h2 className="text-lg font-semibold">Rooms</h2>
           <div className="overflow-x-auto rounded-xl border border-border bg-surface">
             <table className="w-full text-sm">

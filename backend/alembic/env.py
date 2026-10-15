@@ -16,6 +16,19 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 
+def include_name(name, type_, parent_names) -> bool:
+    """Only manage tables our models define.
+
+    Skips PostGIS's own tables (spatial_ref_sys, ...) and the `city` schema,
+    which is loaded by the importer rather than by migrations.
+    """
+    if type_ == "schema":
+        return name is None
+    if type_ == "table":
+        return name in target_metadata.tables
+    return True
+
+
 def run_migrations_offline() -> None:
     context.configure(
         url=settings.database_url,
@@ -23,6 +36,7 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
+        include_name=include_name,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -36,7 +50,10 @@ def run_migrations_online() -> None:
     )
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, target_metadata=target_metadata, compare_type=True
+            connection=connection,
+            target_metadata=target_metadata,
+            compare_type=True,
+            include_name=include_name,
         )
         with context.begin_transaction():
             context.run_migrations()

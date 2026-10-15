@@ -5,10 +5,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
+from app.city.permits import permits_for
+from app.city.zones import zone_label, zone_rules
 from app.config import settings
 from app.db import get_session
-from app.models import Listing
-from app.schemas import Facets, ListingDetail, ListingPage, ListingSummary
+from app.models import Listing, ListingCityData
+from app.schemas import CityData, Facets, ListingDetail, ListingPage, ListingSummary
 
 app = FastAPI(title="Bayt API")
 app.add_middleware(
@@ -109,4 +111,24 @@ def get_listing(listing_id: str, session: SessionDep) -> ListingDetail:
         raise HTTPException(status_code=404, detail="Listing not found")
     return ListingDetail.model_validate(listing, from_attributes=True).model_copy(
         update={"cover_photo": _cover(listing)}
+    )
+
+
+@app.get("/api/listings/{listing_id}/city")
+def get_listing_city_data(listing_id: str, session: SessionDep) -> CityData:
+    """Lot, zoning and permits from City of Toronto open data.
+
+    404 when the listing is outside Toronto or city data has not been loaded.
+    """
+    data = session.get(ListingCityData, listing_id)
+    if data is None:
+        raise HTTPException(status_code=404, detail="No City of Toronto data for this listing")
+    return CityData.model_validate(data, from_attributes=True).model_copy(
+        update={
+            "zone_label": zone_label(data.zone_category),
+            "zone_rules": zone_rules(data.zone_string),
+            "permits": permits_for(session, data.address_point_id)
+            if data.address_point_id
+            else [],
+        }
     )

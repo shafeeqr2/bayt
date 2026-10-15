@@ -2,7 +2,8 @@ name: bayt
 
 services:
   db:
-    image: postgres:17
+    build: ./db
+    image: bayt-db
     environment:
       POSTGRES_USER: bayt
       POSTGRES_PASSWORD: bayt
@@ -39,6 +40,23 @@ services:
       timeout: 5s
       retries: 40
       start_period: 10s
+
+  # One-off loader for City of Toronto open data. Run via `./start.sh city-data`.
+  importer:
+    image: ghcr.io/osgeo/gdal:ubuntu-small-3.13.3
+    profiles: [tools]
+    environment:
+      PGHOST: db
+      PGDATABASE: bayt
+      PGUSER: bayt
+      PGPASSWORD: bayt
+    volumes:
+      - ./importer:/importer:ro
+      - ./data/city:/data
+    command: ["python3", "/importer/import_city_data.py"]
+    depends_on:
+      db:
+        condition: service_healthy
 
 volumes:
   pgdata:

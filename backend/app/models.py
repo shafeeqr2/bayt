@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import DateTime, Float, Integer, String, Text, func
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -56,5 +56,51 @@ class Listing(Base):
 
     source_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class ListingCityData(Base):
+    """A listing matched to City of Toronto open data (address, lot, zoning).
+
+    Rebuilt by `app.city.match` whenever listings or city data are reloaded.
+    Building permits are not copied here; they are looked up live by
+    `address_point_id`.
+    """
+
+    __tablename__ = "listing_city_data"
+
+    listing_id: Mapped[str] = mapped_column(
+        ForeignKey("listings.id", ondelete="CASCADE"), primary_key=True
+    )
+    # How the listing was tied to a city address: "address" (street number and
+    # name match) or "nearest" (closest address point to the listing's pin).
+    match_method: Mapped[str] = mapped_column(Text)
+    match_distance_m: Mapped[float | None] = mapped_column(Float)
+
+    address_point_id: Mapped[int | None] = mapped_column(Integer, index=True)
+    address_full: Mapped[str | None] = mapped_column(Text)
+    former_municipality: Mapped[str | None] = mapped_column(Text)
+    ward: Mapped[str | None] = mapped_column(Text)
+
+    parcel_id: Mapped[int | None] = mapped_column(Integer)
+    lot_area_m2: Mapped[float | None] = mapped_column(Float)
+    lot_frontage_m: Mapped[float | None] = mapped_column(Float)
+    lot_depth_m: Mapped[float | None] = mapped_column(Float)
+    lot_geojson: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+
+    zone_category: Mapped[str | None] = mapped_column(Text)
+    zone_string: Mapped[str | None] = mapped_column(Text)
+    zone_exception: Mapped[str | None] = mapped_column(Text)
+    zoning_bylaw_section: Mapped[str | None] = mapped_column(Text)
+    height_limit_m: Mapped[float | None] = mapped_column(Float)
+    height_limit_storeys: Mapped[int | None] = mapped_column(Integer)
+    lot_coverage_pct: Mapped[float | None] = mapped_column(Float)
+    parking_zone: Mapped[str | None] = mapped_column(Text)
+    policy_area: Mapped[str | None] = mapped_column(Text)
+    rooming_house_area: Mapped[str | None] = mapped_column(Text)
+    heritage_status: Mapped[str | None] = mapped_column(Text)
+
+    computed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

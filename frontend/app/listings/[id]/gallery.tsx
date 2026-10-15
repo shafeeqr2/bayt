@@ -3,7 +3,9 @@
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
-export function Gallery({ photos, alt }: { photos: string[]; alt: string }) {
+type Photo = { high: string; medium: string };
+
+export function Gallery({ photos, alt }: { photos: Photo[]; alt: string }) {
   const [index, setIndex] = useState(0);
   const count = photos.length;
 
@@ -31,8 +33,8 @@ export function Gallery({ photos, alt }: { photos: string[]; alt: string }) {
     <div className="space-y-3">
       <div className="relative aspect-[3/2] overflow-hidden rounded-xl bg-border">
         <Image
-          key={photos[index]}
-          src={photos[index]}
+          key={photos[index].high}
+          src={photos[index].high}
           alt={`${alt}, photo ${index + 1}`}
           fill
           loading="eager"
@@ -66,9 +68,9 @@ export function Gallery({ photos, alt }: { photos: string[]; alt: string }) {
       </div>
       {count > 1 && (
         <div className="flex gap-2 overflow-x-auto pb-1">
-          {photos.map((src, i) => (
+          {photos.map((photo, i) => (
             <button
-              key={src}
+              key={photo.high}
               type="button"
               aria-label={`Show photo ${i + 1}`}
               onClick={() => setIndex(i)}
@@ -76,7 +78,9 @@ export function Gallery({ photos, alt }: { photos: string[]; alt: string }) {
                 i === index ? "border-accent" : "border-transparent opacity-70 hover:opacity-100"
               }`}
             >
-              <Image src={src} alt="" fill sizes="96px" className="object-cover" />
+              {/* The 256px "medium" photo, not "high": a thumbnail sharing the main image's URL
+                  would make Next.js treat the main image as lazy-loaded. */}
+              <Image src={photo.medium} alt="" fill sizes="96px" className="object-cover" />
             </button>
           ))}
         </div>

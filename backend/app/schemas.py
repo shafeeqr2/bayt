@@ -1,3 +1,6 @@
+from datetime import date
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict
 
 
@@ -61,3 +64,60 @@ class ListingPage(BaseModel):
 class Facets(BaseModel):
     cities: list[str]
     building_types: list[str]
+
+
+class Permit(BaseModel):
+    permit_num: str
+    revision_num: str | None
+    permit_type: str | None
+    structure_type: str | None
+    work: str | None
+    status: str | None
+    application_date: date | None
+    issued_date: date | None
+    completed_date: date | None
+    description: str | None
+    current_use: str | None
+    proposed_use: str | None
+    dwelling_units_created: int | None
+    dwelling_units_lost: int | None
+    est_construction_cost: float | None
+
+
+class ZoneRule(BaseModel):
+    label: str
+    value: str
+
+
+class CityData(BaseModel):
+    """What City of Toronto open data says about a listing's address and lot."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    match_method: str
+    match_distance_m: float | None
+    address_full: str | None
+    former_municipality: str | None
+    ward: str | None
+
+    parcel_id: int | None
+    lot_area_m2: float | None
+    lot_frontage_m: float | None
+    lot_depth_m: float | None
+    lot_geojson: dict[str, Any] | None
+
+    zone_category: str | None
+    zone_label: str | None = None
+    zone_rules: list[ZoneRule] = []
+    zone_string: str | None
+    zone_exception: str | None
+    zoning_bylaw_section: str | None
+    height_limit_m: float | None
+    height_limit_storeys: int | None
+    lot_coverage_pct: float | None
+    parking_zone: str | None
+    policy_area: str | None
+    rooming_house_area: str | None
+    heritage_status: str | None
+
+    permits: list[Permit] = []

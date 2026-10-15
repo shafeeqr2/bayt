@@ -65,3 +65,53 @@ export async function getFacets(): Promise<Facets> {
 export async function getListing(id: string): Promise<ListingDetail | null> {
   return get<ListingDetail>(`/api/listings/${encodeURIComponent(id)}`);
 }
+
+export type Permit = {
+  permit_num: string;
+  revision_num: string | null;
+  permit_type: string | null;
+  structure_type: string | null;
+  work: string | null;
+  status: string | null;
+  application_date: string | null;
+  issued_date: string | null;
+  completed_date: string | null;
+  description: string | null;
+  current_use: string | null;
+  proposed_use: string | null;
+  dwelling_units_created: number | null;
+  dwelling_units_lost: number | null;
+  est_construction_cost: number | null;
+};
+
+export type CityData = {
+  match_method: "address" | "nearest";
+  match_distance_m: number | null;
+  address_full: string | null;
+  former_municipality: string | null;
+  ward: string | null;
+  parcel_id: number | null;
+  lot_area_m2: number | null;
+  lot_frontage_m: number | null;
+  lot_depth_m: number | null;
+  lot_geojson: { type: "MultiPolygon"; coordinates: number[][][][] } | null;
+  zone_category: string | null;
+  zone_label: string | null;
+  zone_rules: { label: string; value: string }[];
+  zone_string: string | null;
+  zone_exception: string | null;
+  zoning_bylaw_section: string | null;
+  height_limit_m: number | null;
+  height_limit_storeys: number | null;
+  lot_coverage_pct: number | null;
+  parking_zone: string | null;
+  policy_area: string | null;
+  rooming_house_area: string | null;
+  heritage_status: string | null;
+  permits: Permit[];
+};
+
+/** City of Toronto lot, zoning and permits; null outside Toronto or before `./start.sh city-data`. */
+export async function getCityData(id: string): Promise<CityData | null> {
+  return get<CityData>(`/api/listings/${encodeURIComponent(id)}/city`);
+}

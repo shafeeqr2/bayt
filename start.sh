@@ -88,6 +88,7 @@ cmd_reset() {
   read -r -p "This deletes your local database and reseeds it. Continue? [y/N] " answer
   [[ "$answer" =~ ^[Yy]$ ]] || exit 0
   compose down -v
+  info "City data was removed too; run './start.sh city-data' to reload it (downloads are cached)"
   cmd_up
 }
 
@@ -113,6 +114,23 @@ cmd_migrate() {
   compose exec backend alembic upgrade head
 }
 
+cmd_city_data() {
+  check_docker
+  load_env
+  start_services
+  mkdir -p data/city
+  info "Loading City of Toronto open data (first run downloads ~1 GB and takes a few minutes)"
+  compose run --rm importer python3 /importer/import_city_data.py "$@"
+  compose exec backend python -m app.city.match
+}
+
+cmd_test() {
+  check_docker
+  load_env
+  start_services
+  compose exec backend python -m pytest "$@"
+}
+
 cmd_psql() {
   check_docker
   compose exec db psql -U bayt -d bayt
@@ -126,6 +144,9 @@ Usage: ./start.sh [command]
   backend             Start only Postgres + API (no frontend)
   down                Stop Postgres + API (data is kept)
   reset               Delete the local database and reseed it from backend/seed/
+  city-data [tables]  Download City of Toronto zoning, lots, addresses, permits and
+                      heritage data, then match listings to it (re-run to refresh)
+  test [args]         Run backend tests
   logs [service]      Follow logs (default: backend)
   migration "msg"     Autogenerate an Alembic migration from model changes and apply it
   migrate             Apply pending migrations
@@ -144,6 +165,8 @@ case "$command" in
   logs) cmd_logs "$@" ;;
   migration) cmd_migration "$@" ;;
   migrate) cmd_migrate ;;
+  city-data) cmd_city_data "$@" ;;
+  test) cmd_test "$@" ;;
   psql) cmd_psql ;;
   help | -h | --help) cmd_help ;;
   *) cmd_help; exit 1 ;;
