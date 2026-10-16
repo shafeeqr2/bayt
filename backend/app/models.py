@@ -101,6 +101,21 @@ class ListingCityData(Base):
     rooming_house_area: Mapped[str | None] = mapped_column(Text)
     heritage_status: Mapped[str | None] = mapped_column(Text)
 
+
+class LotAnalysisCache(Base):
+    """Cached result of `app.lot.service.analyze_listing`.
+
+    Lot analysis takes 6-8 calls to the city's GIS, so we keep the last result
+    per listing. `result` is the serialized `app.lot.schemas.LotAnalysis`.
+    """
+
+    __tablename__ = "lot_analyses"
+
+    listing_id: Mapped[str] = mapped_column(
+        String(32), ForeignKey("listings.id", ondelete="CASCADE"), primary_key=True
+    )
+    parcel_id: Mapped[int | None] = mapped_column(Integer, index=True)
+    result: Mapped[dict[str, Any]] = mapped_column(JSONB)
     computed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

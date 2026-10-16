@@ -9,6 +9,8 @@ from app.city.permits import permits_for
 from app.city.zones import zone_label, zone_rules
 from app.config import settings
 from app.db import get_session
+from app.lot import service as lot_service
+from app.lot.schemas import LotAnalysis
 from app.models import Listing, ListingCityData
 from app.schemas import CityData, Facets, ListingDetail, ListingPage, ListingSummary
 
@@ -132,3 +134,37 @@ def get_listing_city_data(listing_id: str, session: SessionDep) -> CityData:
             else [],
         }
     )
+
+
+def _lot_errors(exc: Exception) -> HTTPException:
+    if isinstance(exc, lot_service.NotInCoverage):
+        return HTTPException(status_code=404, detail=str(exc))
+    if isinstance(exc, lot_service.ListingNotLocated):
+        return HTTPException(status_code=422, detail=str(exc))
+    if isinstance(exc, lot_service.GISError):
+        return HTTPException(status_code=502, detail=f"City of Toronto GIS unavailable: {exc}")
+    raise exc
+
+
+@app.get("/api/listings/{listing_id}/lot")
+def get_listing_lot(listing_id: str, session: SessionDep, refresh: bool = False) -> LotAnalysis:
+    """Lot coverage and infill potential for a listing (cached for 30 days)."""
+    listing = session.get(Listing, listing_id)
+    if listing is None:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    try:
+        return lot_service.analyze_listing(session, listing, refresh=refresh)
+    except (lot_service.NotInCoverage, lot_service.ListingNotLocated, lot_service.GISError) as exc:
+        raise _lot_errors(exc) from exc
+
+
+@app.get("/api/lot")
+def get_lot(
+    lat: Annotated[float, Query(ge=-90, le=90)],
+    lon: Annotated[float, Query(ge=-180, le=180)],
+) -> LotAnalysis:
+    """Lot coverage and infill potential for any point in Toronto (not cached)."""
+    try:
+        return lot_service.analyze_point(lat, lon)
+    except (lot_service.NotInCoverage, lot_service.GISError) as exc:
+        raise _lot_errors(exc) from exc

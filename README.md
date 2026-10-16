@@ -86,6 +86,66 @@ Listings in Vaughan, Markham, Mississauga and other cities have no city data.
 The importer runs in a GDAL container (`importer` service in `docker-compose.yml`).
 The `city` schema is owned by the importer, not by Alembic, so migrations never touch it.
 
+## Lot analysis
+
+The API reports how much of a lot the house takes up and whether the lot could take another home (a severance or a garden suite).
+Nobody publishes this ready-made: the City of Toronto publishes lot outlines and building outlines separately, and the backend computes the ratio and the zoning tests itself.
+Only Toronto addresses are covered.
+
+### Calling it
+
+With the backend running on the default port, the two URLs are:
+
+```bash
+# For a listing in the database (result cached for 30 days; add ?refresh=true to recompute)
+curl http://localhost:8000/api/listings/30403339/lot
+
+# For any point in Toronto, not tied to a listing
+curl "http://localhost:8000/api/lot?lat=43.7153901&lon=-79.2914554"
+```
+
+Both are also listed under http://localhost:8000/docs.
+Behind the scenes the backend sends 6 to 8 small queries to the City of Toronto's public GIS server (`https://gis.toronto.ca/arcgis/rest/services/...`) for the parcel, neighbouring parcels, building footprints, zoning, lot coverage overlay, sixplex permission and street centrelines, then does the geometry in Python.
+See [docs/lot-analysis.md](docs/lot-analysis.md) for the method and accuracy and [docs/geodata-primer.md](docs/geodata-primer.md) for what parcels, parcel fabric, GIS servers and Open Data are.
+
+### How much of the lot the house takes up
+
+Read the `coverage` object in the response. For 17 Hollydene Rd (listing `30403339`):
+
+```json
+"coverage": {
+  "building_footprint_m2": 77.8,
+  "main_building_m2": 77.8,
+  "ancillary_m2": 0.0,
+  "coverage_pct": 16.8,
+  "open_pct": 83.2,
+  "max_coverage_pct": 33.0,
+  "max_coverage_pct_with_houseplex": 45.0,
+  "remaining_buildable_footprint_m2": 75.4
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `coverage_pct` | All structures divided by lot area. The house takes up 16.8% of this lot. |
+| `open_pct` | The rest: 83.2% is not built on. |
+| `main_building_m2` / `ancillary_m2` | The house versus garages and sheds, using the city's own classification. |
+| `max_coverage_pct` | Zoning cap from the Lot Coverage Overlay. `null` means the zone has no cap. |
+| `max_coverage_pct_with_houseplex` | The cap rises to 45% for a multiplex (houseplex). |
+| `remaining_buildable_footprint_m2` | Ground area still allowed under the cap: another 75 m² here. |
+
+Each footprint is also listed under `buildings` with its area, height and type, and the polygons for the parcel, buildings, front lot line and rear yard are in `geometry` as GeoJSON for drawing on a map.
+
+"Open" means not built on. Driveways, patios and pools are not in the footprint data, so open land is not necessarily green.
+
+### The rest of the response
+
+- `parcel`: lot area, frontage (measured the way the zoning by-law does), depth, and flags for corner lots, laneways and irregular shapes.
+- `zoning`: zone label (for example `RD (f15.0; a550) (x5)`), minimum frontage and lot area, and how many units are allowed as of right (4, or 6 in sixplex wards).
+- `severance`: whether the lot could be split in two, with each half checked against the zone minimums and the prevailing lot pattern on the street.
+- `garden_suite`: whether a garden suite fits in the rear yard after the by-law's separation, setbacks and footprint caps.
+- `caveats`: warnings such as a shared condo parcel or a site-specific zoning exception. Read these before trusting the verdicts.
+
 ## Tests
 
 ```bash
