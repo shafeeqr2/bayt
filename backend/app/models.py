@@ -37,6 +37,8 @@ class Listing(Base):
     stories: Mapped[str | None] = mapped_column(Text)
     lot_size: Mapped[str | None] = mapped_column(Text)
     parking_spaces: Mapped[int | None] = mapped_column(Integer)
+    # REALTOR.ca's comma-joined parking features, e.g. "Attached Garage, Garage" or "Underground, No Garage".
+    parking_type: Mapped[str | None] = mapped_column(Text)
 
     address: Mapped[str | None] = mapped_column(Text)
     city: Mapped[str | None] = mapped_column(Text, index=True)

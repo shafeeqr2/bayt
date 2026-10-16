@@ -103,6 +103,7 @@ def normalize(item: dict[str, Any]) -> Listing | None:
         stories=building.get("StoriesTotal") or None,
         lot_size=land.get("SizeTotal") or None,
         parking_spaces=_int(prop.get("ParkingSpaceTotal")),
+        parking_type=prop.get("ParkingType") or None,
         address=address_lines[0].title() if address_lines[0] else None,
         city=(address.get("City") or "").split(" (")[0] or None,
         community=address.get("CommunityName"),

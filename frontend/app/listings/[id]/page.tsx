@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
 import { getListing } from "@/lib/api";
-import { formatPrice, formatSqft } from "@/lib/format";
+import { formatParking, formatPrice, formatSqft } from "@/lib/format";
 import { CitySection } from "./city-section";
 import { Gallery } from "./gallery";
 
@@ -26,7 +26,7 @@ export default async function ListingPage({ params }: PageProps<"/listings/[id]"
     ["Ownership", listing.ownership_type],
     ["Storeys", listing.stories],
     ["Lot", listing.lot_size],
-    ["Parking", listing.parking_spaces],
+    ["Parking", formatParking(listing.parking_spaces, listing.parking_type)],
     ["Property tax", listing.tax_annual ? `${formatPrice(listing.tax_annual)} / yr` : null],
     [
       "Maintenance",

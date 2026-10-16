@@ -95,7 +95,6 @@ function Zoning({ city }: { city: CityData }) {
           ["Height limit", city.height_limit_m ? `${city.height_limit_m} m` : null],
           ["Max storeys", city.height_limit_storeys ? String(city.height_limit_storeys) : null],
           ["Max lot coverage", city.lot_coverage_pct ? `${city.lot_coverage_pct}%` : null],
-          ["Parking zone", city.parking_zone],
           ["By-law section", city.zoning_bylaw_section],
         ]}
       />
@@ -106,6 +105,18 @@ function Zoning({ city }: { city: CityData }) {
           {city.zone_exception && ` Site-specific exception #${city.zone_exception} may change those rules.`}
         </p>
       )}
+      <Parking city={city} />
+    </div>
+  );
+}
+
+function Parking({ city }: { city: CityData }) {
+  if (city.parking_rules.length === 0) return null;
+  return (
+    <div className="space-y-3 border-t border-border pt-5">
+      <p className="text-sm text-muted">Parking rules (By-law 569-2013, Chapter 200)</p>
+      <Facts items={city.parking_rules.map((rule): [string, string] => [rule.label, rule.value])} />
+      {city.parking_note && <p className="text-sm leading-relaxed text-muted">{city.parking_note}</p>}
     </div>
   );
 }
