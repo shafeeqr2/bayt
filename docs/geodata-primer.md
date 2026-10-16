@@ -38,6 +38,7 @@ No. The GIS server belongs to the City of Toronto. The Bayt service is a client 
 
 - **The city's GIS server** at `gis.toronto.ca/arcgis/rest/services` is a public ArcGIS Server run by the City of Toronto.
   It hosts the parcel, building outline, zoning and centreline layers and answers spatial queries such as "which parcel contains this point" or "which building footprints overlap this polygon."
+  Open Data Toronto also mirrors some of these layers to ArcGIS Online (`services3.arcgis.com/b9WvedVPoizGfvfD`); the service reads the Centreline from that mirror because the city's own Centreline service is slow.
   No account or key is needed. We do not run or control it.
 - **The Bayt lot service** in `backend/app/lot/` is code in our backend.
   When someone asks for a listing's lot, it sends 6 to 8 small queries to the city's server, receives the polygons back, and does all the analysis itself: projecting to metres, finding the front lot line, unioning footprints, computing coverage, applying the zoning rules, testing the split and the garden suite.

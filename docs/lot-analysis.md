@@ -29,7 +29,7 @@ The original idea was to pull recent SAR satellite imagery for the listing's GPS
 | Microsoft / Overture / StatCan Open Database of Buildings | ML-derived footprints, country-wide | Fallback for cities without municipal data; less accurate on attached housing |
 | Teranet parcel fabric | Province-wide parcels | Licensed, paid; not needed inside Toronto |
 
-All four city datasets are on Open Data Toronto as downloads **and** as live ArcGIS FeatureServer layers under `https://gis.toronto.ca/arcgis/rest/services/`. The live layers answer a point-in-polygon or bounding-box query in well under a second, so the service queries them on demand and caches the result. No PostGIS, no 1 GB download, no imagery pipeline.
+All four city datasets are on Open Data Toronto as downloads **and** as live ArcGIS FeatureServer layers under `https://gis.toronto.ca/arcgis/rest/services/`. The live layers answer a point-in-polygon or bounding-box query in well under a second, so the service queries them on demand and caches the result. The one exception is the Centreline: its service on `gis.toronto.ca` regularly queues requests for a minute at a time, so the code reads the Centreline from Open Data Toronto's ArcGIS Online mirror (`services3.arcgis.com/b9WvedVPoizGfvfD/arcgis/rest/services/COTGEO_CENTRELINE`, same fields, same refresh) and only falls back to the city's layer when the mirror fails. No PostGIS, no 1 GB download, no imagery pipeline.
 
 ### Hypothesis test
 

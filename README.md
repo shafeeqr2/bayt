@@ -129,7 +129,7 @@ To fill that cache for every Toronto listing ahead of time (so listing pages sho
 ```
 
 Condo listings are skipped: their parcel covers the whole condo corporation, so lot coverage means nothing for them.
-Behind the scenes the backend sends 6 to 8 small queries to the City of Toronto's public GIS server (`https://gis.toronto.ca/arcgis/rest/services/...`) for the parcel, neighbouring parcels, building footprints, zoning, lot coverage overlay, sixplex permission and street centrelines, then does the geometry in Python.
+Behind the scenes the backend sends 6 to 8 small queries to the City of Toronto's public GIS server (`https://gis.toronto.ca/arcgis/rest/services/...`) for the parcel, neighbouring parcels, building footprints, zoning, lot coverage overlay, sixplex permission and street centrelines, then does the geometry in Python. The centreline query goes to Open Data Toronto's ArcGIS Online mirror of the same layer (`services3.arcgis.com/b9WvedVPoizGfvfD/...`), which answers in well under a second while the city's own Centreline service often queues requests for a minute; the city's layer is kept as a fallback.
 See [docs/lot-analysis.md](docs/lot-analysis.md) for the method and accuracy and [docs/geodata-primer.md](docs/geodata-primer.md) for what parcels, parcel fabric, GIS servers and Open Data are.
 
 ### How much of the lot the house takes up

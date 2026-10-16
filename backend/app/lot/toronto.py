@@ -24,6 +24,11 @@ from shapely.geometry import Point, shape
 from shapely.geometry.base import BaseGeometry
 
 BASE = "https://gis.toronto.ca/arcgis/rest/services"
+# Open Data Toronto also mirrors some layers to ArcGIS Online (same data, same
+# field names, refreshed with the open dataset). The mirror is far more
+# responsive than gis.toronto.ca for the Centreline, whose own service queues
+# requests for a minute at a time during the day.
+MIRROR = "https://services3.arcgis.com/b9WvedVPoizGfvfD/arcgis/rest/services"
 
 # The city's server is occasionally slow or answers 503 for a few seconds;
 # a short retry turns most of those into a successful call.
@@ -36,7 +41,11 @@ LAYERS = {
     "zoning": f"{BASE}/cot_geospatial11/FeatureServer/3",
     "lot_coverage": f"{BASE}/cot_geospatial11/FeatureServer/10",
     "sixplex": f"{BASE}/cot_geospatial11/FeatureServer/80",
-    "centreline": f"{BASE}/cot_geospatial/FeatureServer/2",
+    "centreline": f"{MIRROR}/COTGEO_CENTRELINE/FeatureServer/0",
+}
+# Tried in order when the layer above fails (after its own retries).
+FALLBACK_LAYERS: dict[str, list[str]] = {
+    "centreline": [f"{BASE}/cot_geospatial/FeatureServer/2"],
 }
 
 NEARBY_M = 75  # how far around the parcel to collect building footprints for the 3D view
@@ -118,9 +127,20 @@ class TorontoGIS:
         ]
 
     def _get_with_retries(self, layer: str, params: dict[str, Any]) -> dict[str, Any]:
+        """Query the layer, falling back to its alternate hosts when one is down."""
+        urls = [LAYERS[layer], *FALLBACK_LAYERS.get(layer, [])]
+        for i, url in enumerate(urls):
+            try:
+                return self._post_with_retries(layer, url, params)
+            except GISError:
+                if i == len(urls) - 1:
+                    raise
+        raise AssertionError("unreachable")  # pragma: no cover
+
+    def _post_with_retries(self, layer: str, base_url: str, params: dict[str, Any]) -> dict[str, Any]:
         # POST, not GET: a polygon with a few dozen vertices makes a URL long
         # enough for the city's firewall to reject the request with an HTML page.
-        url = f"{LAYERS[layer]}/query"
+        url = f"{base_url}/query"
         for attempt in range(1, RETRIES + 1):
             try:
                 resp = self._client.post(url, data=params)
