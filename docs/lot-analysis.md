@@ -65,8 +65,16 @@ Verdicts are `likely`, `possible` (within 10% of a minimum, or blocked only by a
 - Building outlines are LiDAR-derived and refresh quarterly, so a brand-new build or demolition can lag.
 - Depends on the city's GIS being up; failures return 502. Results are cached per listing for 30 days.
 
+## On the listing page and in the cache
+
+The listing page's "Lot & zoning" section draws the parcel, building footprints, front lot line and rear yard to scale and shows the coverage figures against the zoning cap.
+It falls back to the parcel outline alone while the analysis loads, outside Toronto, or when the city's GIS is down.
+
+`./start.sh lot-analysis` (`python -m app.lot.backfill`) precomputes the analysis for every Toronto listing so pages never wait on the city.
+It skips listings with a fresh cached result, counts the ones the city cannot place on an ordinary parcel (condos), and leaves failures uncached so a re-run retries them.
+Queries are sent as POST: the city's firewall rejects GET URLs carrying a parcel polygon with more than a few dozen vertices.
+
 ## Next steps
 
-- Show the result on the listing page (parcel, footprint, frontage and rear-yard GeoJSON are in the response for a map).
-- Precompute for all Toronto listings at seed time so search can filter on "severable" or "garden suite possible".
+- Show the severance and garden-suite verdicts on the listing page, and let search filter on them.
 - Add other municipalities' open data behind `LotInputs`.

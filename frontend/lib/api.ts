@@ -115,3 +115,78 @@ export type CityData = {
 export async function getCityData(id: string): Promise<CityData | null> {
   return get<CityData>(`/api/listings/${encodeURIComponent(id)}/city`);
 }
+
+export type GeoPolygon = { type: "Polygon"; coordinates: number[][][] };
+export type GeoMultiPolygon = { type: "MultiPolygon"; coordinates: number[][][][] };
+export type GeoLineString = { type: "LineString"; coordinates: number[][] };
+export type GeoArea = GeoPolygon | GeoMultiPolygon;
+
+export type Verdict = "likely" | "possible" | "unlikely" | "not_applicable" | "unknown";
+
+/** What the backend computed from the city's parcel, building and zoning layers. */
+export type LotAnalysis = {
+  parcel: {
+    parcel_id: number | null;
+    address_number: string | null;
+    street: string | null;
+    area_m2: number;
+    stated_area_m2: number | null;
+    frontage_m: number | null;
+    front_lot_line_m: number | null;
+    depth_m: number | null;
+    frontage_confidence: "high" | "medium" | "low";
+    corner_lot: boolean;
+    abuts_laneway: boolean;
+    irregular: boolean;
+  };
+  buildings: { building_id: number | null; kind: string; footprint_m2: number; height_m: number | null; is_main: boolean }[];
+  coverage: {
+    building_footprint_m2: number;
+    main_building_m2: number;
+    ancillary_m2: number;
+    coverage_pct: number;
+    open_pct: number;
+    max_coverage_pct: number | null;
+    max_coverage_pct_with_houseplex: number | null;
+    remaining_buildable_footprint_m2: number | null;
+  };
+  zoning: {
+    zone_label: string | null;
+    zone: string | null;
+    low_rise_residential: boolean;
+    min_lot_frontage_m: number | null;
+    min_lot_area_m2: number | null;
+    min_values_are_defaults: boolean;
+    has_site_exception: boolean;
+    exception_link: string | null;
+    bylaw_link: string | null;
+    as_of_right_units: number | null;
+  };
+  severance: { verdict: Verdict; notes: string[] };
+  garden_suite: { verdict: Verdict; max_footprint_m2: number | null; notes: string[] };
+  geometry: {
+    parcel: GeoArea;
+    buildings: GeoArea[];
+    frontage: GeoLineString | null;
+    rear_yard: GeoArea | null;
+  };
+  caveats: string[];
+  sources: string[];
+  computed_at: string;
+};
+
+/**
+ * Lot map and coverage computed from City of Toronto GIS layers.
+ * null outside Toronto, for listings without coordinates, or while the city's GIS is unreachable.
+ */
+export async function getLotAnalysis(id: string): Promise<LotAnalysis | null> {
+  const path = `/api/listings/${encodeURIComponent(id)}/lot`;
+  const res = await fetch(`${BACKEND_URL}${path}`);
+  if (res.status === 404 || res.status === 422) return null;
+  if (res.status === 502) {
+    console.warn(`API ${path}: City of Toronto GIS unavailable`);
+    return null;
+  }
+  if (!res.ok) throw new Error(`API ${path} failed: ${res.status}`);
+  return res.json();
+}

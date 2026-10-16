@@ -12,7 +12,7 @@ from app.db import get_session
 from app.lot import service as lot_service
 from app.lot.schemas import LotAnalysis
 from app.models import Listing, ListingCityData
-from app.schemas import CityData, Facets, ListingDetail, ListingPage, ListingSummary
+from app.schemas import CityData, Facets, ListingDetail, ListingPage, ListingSummary, ZoneRule
 
 app = FastAPI(title="Bayt API")
 app.add_middleware(
@@ -128,7 +128,7 @@ def get_listing_city_data(listing_id: str, session: SessionDep) -> CityData:
     return CityData.model_validate(data, from_attributes=True).model_copy(
         update={
             "zone_label": zone_label(data.zone_category),
-            "zone_rules": zone_rules(data.zone_string),
+            "zone_rules": [ZoneRule.model_validate(rule) for rule in zone_rules(data.zone_string)],
             "permits": permits_for(session, data.address_point_id)
             if data.address_point_id
             else [],

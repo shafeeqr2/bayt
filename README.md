@@ -105,6 +105,16 @@ curl "http://localhost:8000/api/lot?lat=43.7153901&lon=-79.2914554"
 ```
 
 Both are also listed under http://localhost:8000/docs.
+
+The first call for a listing takes a few seconds because it goes to the city's GIS; the result is then cached for 30 days.
+To fill that cache for every Toronto listing ahead of time (so listing pages show the lot map and coverage at once), run:
+
+```bash
+./start.sh lot-analysis            # every Toronto listing without a fresh result; re-run to retry failures
+./start.sh lot-analysis --refresh  # recompute everything, e.g. after the city's quarterly building-outline update
+```
+
+Condo listings are skipped: their parcel covers the whole condo corporation, so lot coverage means nothing for them.
 Behind the scenes the backend sends 6 to 8 small queries to the City of Toronto's public GIS server (`https://gis.toronto.ca/arcgis/rest/services/...`) for the parcel, neighbouring parcels, building footprints, zoning, lot coverage overlay, sixplex permission and street centrelines, then does the geometry in Python.
 See [docs/lot-analysis.md](docs/lot-analysis.md) for the method and accuracy and [docs/geodata-primer.md](docs/geodata-primer.md) for what parcels, parcel fabric, GIS servers and Open Data are.
 
@@ -135,6 +145,7 @@ Read the `coverage` object in the response. For 17 Hollydene Rd (listing `304033
 | `remaining_buildable_footprint_m2` | Ground area still allowed under the cap: another 75 m² here. |
 
 Each footprint is also listed under `buildings` with its area, height and type, and the polygons for the parcel, buildings, front lot line and rear yard are in `geometry` as GeoJSON for drawing on a map.
+The listing page draws exactly that: the lot to scale with the building footprints, front lot line and rear yard, next to the coverage figures against the zoning cap.
 
 "Open" means not built on. Driveways, patios and pools are not in the footprint data, so open land is not necessarily green.
 

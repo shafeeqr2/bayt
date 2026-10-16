@@ -124,6 +124,14 @@ cmd_city_data() {
   compose exec backend python -m app.city.match
 }
 
+cmd_lot_analysis() {
+  check_docker
+  load_env
+  start_services
+  info "Computing lot analyses (map, coverage, infill potential) for Toronto listings via the city's GIS"
+  compose exec backend python -m app.lot.backfill "$@"
+}
+
 cmd_test() {
   check_docker
   load_env
@@ -146,6 +154,9 @@ Usage: ./start.sh [command]
   reset               Delete the local database and reseed it from backend/seed/
   city-data [tables]  Download City of Toronto zoning, lots, addresses, permits and
                       heritage data, then match listings to it (re-run to refresh)
+  lot-analysis [args] Compute lot analyses (lot map, coverage, severance and garden
+                      suite potential) for every Toronto listing (re-run to retry
+                      failures; --refresh recomputes, --help for more)
   test [args]         Run backend tests
   logs [service]      Follow logs (default: backend)
   migration "msg"     Autogenerate an Alembic migration from model changes and apply it
@@ -166,6 +177,7 @@ case "$command" in
   migration) cmd_migration "$@" ;;
   migrate) cmd_migrate ;;
   city-data) cmd_city_data "$@" ;;
+  lot-analysis) cmd_lot_analysis "$@" ;;
   test) cmd_test "$@" ;;
   psql) cmd_psql ;;
   help | -h | --help) cmd_help ;;

@@ -1,6 +1,8 @@
+import { Suspense } from "react";
+
 import { getCityData, type CityData, type Permit } from "@/lib/api";
 import { formatArea, formatDate, formatMetres, formatPrice } from "@/lib/format";
-import { LotShape } from "./lot-shape";
+import { CoverageFacts, LotMapCell, ParcelOnly } from "./lot-panel";
 
 // Zones where Toronto has allowed up to four units as-of-right since May 2023.
 const MULTIPLEX_ZONES = new Set(["R", "RD", "RS", "RT", "RM"]);
@@ -22,12 +24,10 @@ export async function CitySection({ id }: { id: string }) {
       </div>
 
       <div className="grid gap-6 rounded-xl border border-border bg-surface p-5 md:grid-cols-[15rem_minmax(0,1fr)]">
-        {city.lot_geojson ? (
-          <div className="space-y-2">
-            <LotShape geojson={city.lot_geojson} />
-            <p className="text-xs text-muted">Lot boundary to scale</p>
-          </div>
-        ) : null}
+        {/* The lot analysis needs the city's GIS, so it streams in after the rest. */}
+        <Suspense fallback={<ParcelOnly geojson={city.lot_geojson} />}>
+          <LotMapCell id={id} city={city} />
+        </Suspense>
         <div className="space-y-5">
           <Facts
             items={[
@@ -37,6 +37,9 @@ export async function CitySection({ id }: { id: string }) {
               ["Heritage", city.heritage_status ? `Heritage register: ${city.heritage_status}` : "Not on the heritage register"],
             ]}
           />
+          <Suspense fallback={null}>
+            <CoverageFacts id={id} />
+          </Suspense>
           <Zoning city={city} />
         </div>
       </div>

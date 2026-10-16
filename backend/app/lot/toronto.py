@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import math
+import time
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -23,6 +24,11 @@ from shapely.geometry import Point, shape
 from shapely.geometry.base import BaseGeometry
 
 BASE = "https://gis.toronto.ca/arcgis/rest/services"
+
+# The city's server is occasionally slow or answers 503 for a few seconds;
+# a short retry turns most of those into a successful call.
+RETRIES = 3
+RETRY_BACKOFF_S = 1.5
 
 LAYERS = {
     "parcels": f"{BASE}/cot_geospatial27/FeatureServer/36",
@@ -71,7 +77,7 @@ class LotInputs:
 
 
 class TorontoGIS:
-    def __init__(self, client: httpx.Client | None = None, timeout: float = 20.0):
+    def __init__(self, client: httpx.Client | None = None, timeout: float = 30.0):
         self._client = client or httpx.Client(timeout=timeout, headers={"User-Agent": "bayt/0.1"})
 
     # -- low level -----------------------------------------------------------
@@ -101,19 +107,41 @@ class TorontoGIS:
         if distance_m:
             params["distance"] = distance_m
             params["units"] = "esriSRUnit_Meter"
-        try:
-            resp = self._client.get(f"{LAYERS[layer]}/query", params=params)
-            resp.raise_for_status()
-            data = resp.json()
-        except (httpx.HTTPError, ValueError) as e:
-            raise GISError(f"{layer}: {e}") from e
-        if "error" in data:
-            raise GISError(f"{layer}: {data['error']}")
+        data = self._get_with_retries(layer, params)
         return [
             Feature(shape(f["geometry"]), f.get("properties") or {})
             for f in data.get("features", [])
             if f.get("geometry")
         ]
+
+    def _get_with_retries(self, layer: str, params: dict[str, Any]) -> dict[str, Any]:
+        # POST, not GET: a polygon with a few dozen vertices makes a URL long
+        # enough for the city's firewall to reject the request with an HTML page.
+        url = f"{LAYERS[layer]}/query"
+        for attempt in range(1, RETRIES + 1):
+            try:
+                resp = self._client.post(url, data=params)
+                resp.raise_for_status()
+            except (httpx.TimeoutException, httpx.NetworkError, httpx.HTTPStatusError) as e:
+                server_side = not isinstance(e, httpx.HTTPStatusError) or e.response.status_code >= 500
+                if not server_side or attempt == RETRIES:
+                    raise GISError(f"{layer}: {e}") from e
+                time.sleep(RETRY_BACKOFF_S * attempt)
+                continue
+            except httpx.HTTPError as e:
+                raise GISError(f"{layer}: {e}") from e
+            try:
+                data = resp.json()
+            except ValueError as e:
+                raise GISError(f"{layer}: non-JSON response: {resp.text[:80]!r}") from e
+            if "error" in data:
+                # ArcGIS reports its own overloads as HTTP 200 with an error object.
+                if int(data["error"].get("code", 0)) >= 500 and attempt < RETRIES:
+                    time.sleep(RETRY_BACKOFF_S * attempt)
+                    continue
+                raise GISError(f"{layer}: {data['error']}")
+            return data
+        raise GISError(f"{layer}: gave up after {RETRIES} attempts")  # pragma: no cover
 
     @staticmethod
     def _point(lat: float, lon: float) -> tuple[str, str]:
