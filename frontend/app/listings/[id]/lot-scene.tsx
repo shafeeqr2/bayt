@@ -154,8 +154,13 @@ export function LotScene({ parcel, buildings, nearbyBuildings, nearbyParcels, fr
         });
       }
 
-      // Put our layers under the basemap's labels so street names stay readable.
-      const firstSymbol = (map.getStyle() as StyleSpecification).layers.find((l) => l.type === "symbol")?.id;
+      // Put our layers right above the basemap's flat building fill (which would otherwise
+      // paint over the roofs) and under its labels so street names stay readable.
+      const layers = (map.getStyle() as StyleSpecification).layers;
+      const lastBuildingFill = [...layers].reverse().find((l) => l.type === "fill" && l["source-layer"] === "building");
+      const firstSymbol = lastBuildingFill
+        ? layers[layers.findIndex((l) => l.id === lastBuildingFill.id) + 1]?.id
+        : layers.find((l) => l.type === "symbol")?.id;
 
       map.addLayer(
         { id: "nearby-parcels", type: "line", source: "nearby-parcels", paint: { "line-color": neighbourLine, "line-width": 0.8, "line-opacity": 0.6 } },

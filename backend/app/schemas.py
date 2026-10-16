@@ -43,6 +43,7 @@ class ListingDetail(ListingSummary):
     stories: str | None
     lot_size: str | None
     parking_spaces: int | None
+    parking_type: str | None
     postal_code: str | None
     cross_streets: str | None
     latitude: float | None
@@ -52,6 +53,23 @@ class ListingDetail(ListingSummary):
     description: str | None
     photos: list[Photo]
     rooms: list[Room]
+
+
+class MapPin(BaseModel):
+    """Just enough of a listing to draw and label it on the search map."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    price: int
+    latitude: float
+    longitude: float
+    building_type: str | None
+    bedrooms_text: str | None
+    bathrooms: int | None
+    address: str | None
+    community: str | None
+    cover_photo: str | None = None
 
 
 class ListingPage(BaseModel):
@@ -116,6 +134,9 @@ class CityData(BaseModel):
     height_limit_storeys: int | None
     lot_coverage_pct: float | None
     parking_zone: str | None
+    # What Zoning By-law 569-2013 Chapter 200 says about parking for this zone and building type.
+    parking_rules: list[ZoneRule] = []
+    parking_note: str | None = None
     policy_area: str | None
     rooming_house_area: str | None
     heritage_status: str | None

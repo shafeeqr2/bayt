@@ -1,18 +1,20 @@
 from typing import Annotated, Literal
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
+from app.city.parking import parking_rules
 from app.city.permits import permits_for
+from app.city.tiles import MAX_ZOOM, MIN_ZOOM, building_tile, buildings_loaded, city_boundary
 from app.city.zones import zone_label, zone_rules
 from app.config import settings
 from app.db import get_session
 from app.lot import service as lot_service
 from app.lot.schemas import LotAnalysis
 from app.models import Listing, ListingCityData
-from app.schemas import CityData, Facets, ListingDetail, ListingPage, ListingSummary, ZoneRule
+from app.schemas import CityData, Facets, ListingDetail, ListingPage, ListingSummary, MapPin, ZoneRule
 
 app = FastAPI(title="Bayt API")
 app.add_middleware(
@@ -48,9 +50,7 @@ def health(session: SessionDep) -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.get("/api/listings")
-def list_listings(
-    session: SessionDep,
+def listing_filters(
     city: str | None = None,
     building_type: str | None = None,
     min_price: Annotated[int | None, Query(ge=0)] = None,
@@ -58,10 +58,8 @@ def list_listings(
     min_beds: Annotated[int | None, Query(ge=0)] = None,
     min_baths: Annotated[int | None, Query(ge=0)] = None,
     q: str | None = None,
-    sort: Literal["newest", "price_asc", "price_desc"] = "newest",
-    limit: Annotated[int, Query(ge=1, le=100)] = 24,
-    offset: Annotated[int, Query(ge=0)] = 0,
-) -> ListingPage:
+) -> list:
+    """The search filters, shared by the list and the map so both agree on what matches."""
     filters = []
     if city:
         filters.append(Listing.city == city)
@@ -82,7 +80,20 @@ def list_listings(
             | Listing.community.ilike(pattern)
             | Listing.mls_number.ilike(pattern)
         )
+    return filters
 
+
+FiltersDep = Annotated[list, Depends(listing_filters)]
+
+
+@app.get("/api/listings")
+def list_listings(
+    session: SessionDep,
+    filters: FiltersDep,
+    sort: Literal["newest", "price_asc", "price_desc"] = "newest",
+    limit: Annotated[int, Query(ge=1, le=100)] = 24,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> ListingPage:
     total = session.scalar(select(func.count()).select_from(Listing).where(*filters)) or 0
     rows = session.scalars(
         select(Listing)
@@ -106,6 +117,22 @@ def facets(session: SessionDep) -> Facets:
     return Facets(cities=distinct(Listing.city), building_types=distinct(Listing.building_type))
 
 
+@app.get("/api/listings/map")
+def map_pins(session: SessionDep, filters: FiltersDep) -> list[MapPin]:
+    """Every listing matching the filters, as pins for the search map (no paging)."""
+    rows = session.scalars(
+        select(Listing)
+        .where(Listing.latitude.is_not(None), Listing.longitude.is_not(None), *filters)
+        .order_by(Listing.price.desc(), Listing.id)
+    ).all()
+    return [
+        MapPin.model_validate(r, from_attributes=True).model_copy(
+            update={"cover_photo": r.photos[0]["medium"] if r.photos else None}
+        )
+        for r in rows
+    ]
+
+
 @app.get("/api/listings/{listing_id}")
 def get_listing(listing_id: str, session: SessionDep) -> ListingDetail:
     listing = session.get(Listing, listing_id)
@@ -125,15 +152,51 @@ def get_listing_city_data(listing_id: str, session: SessionDep) -> CityData:
     data = session.get(ListingCityData, listing_id)
     if data is None:
         raise HTTPException(status_code=404, detail="No City of Toronto data for this listing")
+    listing = session.get(Listing, listing_id)
+    rules, parking_note = parking_rules(
+        data.zone_category,
+        data.parking_zone,
+        listing.building_type if listing else None,
+        listing.bedrooms_total if listing else None,
+    )
     return CityData.model_validate(data, from_attributes=True).model_copy(
         update={
             "zone_label": zone_label(data.zone_category),
             "zone_rules": [ZoneRule.model_validate(rule) for rule in zone_rules(data.zone_string)],
+            "parking_rules": [ZoneRule(label=rule.label, value=rule.value) for rule in rules],
+            "parking_note": parking_note,
             "permits": permits_for(session, data.address_point_id)
             if data.address_point_id
             else [],
         }
     )
+
+
+@app.get("/api/tiles/buildings/{z}/{x}/{y}")
+def building_tiles(z: int, x: int, y: int, session: SessionDep) -> Response:
+    """Vector tile of City of Toronto building outlines with LiDAR heights.
+
+    204 outside the zoom range or before `./start.sh city-data` has loaded buildings.
+    """
+    if not MIN_ZOOM <= z <= MAX_ZOOM or not 0 <= x < 2**z or not 0 <= y < 2**z or not buildings_loaded(session):
+        return Response(status_code=204)
+    tile = building_tile(session, z, x, y)
+    if not tile:
+        return Response(status_code=204)
+    return Response(
+        tile,
+        media_type="application/vnd.mapbox-vector-tile",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
+@app.get("/api/city/boundary")
+def get_city_boundary(session: SessionDep) -> Response:
+    """Toronto's municipal limits as GeoJSON, for deciding where city data applies."""
+    geojson = city_boundary(session)
+    if geojson is None:
+        raise HTTPException(status_code=404, detail="City boundary not loaded")
+    return Response(geojson, media_type="application/geo+json", headers={"Cache-Control": "public, max-age=86400"})
 
 
 def _lot_errors(exc: Exception) -> HTTPException:

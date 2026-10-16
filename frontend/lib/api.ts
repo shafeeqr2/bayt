@@ -1,6 +1,6 @@
 import "server-only";
 
-const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:8000";
+import { BACKEND_URL } from "./backend";
 
 export type ListingSummary = {
   id: string;
@@ -27,6 +27,7 @@ export type ListingDetail = ListingSummary & {
   stories: string | null;
   lot_size: string | null;
   parking_spaces: number | null;
+  parking_type: string | null;
   postal_code: string | null;
   cross_streets: string | null;
   latitude: number | null;
@@ -105,6 +106,8 @@ export type CityData = {
   height_limit_storeys: number | null;
   lot_coverage_pct: number | null;
   parking_zone: string | null;
+  parking_rules: { label: string; value: string }[];
+  parking_note: string | null;
   policy_area: string | null;
   rooming_house_area: string | null;
   heritage_status: string | null;
@@ -201,3 +204,17 @@ export async function getLotAnalysis(id: string): Promise<LotAnalysis | null> {
   if (!res.ok) throw new Error(`API ${path} failed: ${res.status}`);
   return res.json();
 }
+
+/** A listing reduced to what the search map draws and shows in its card. */
+export type MapPin = {
+  id: string;
+  price: number;
+  latitude: number;
+  longitude: number;
+  building_type: string | null;
+  bedrooms_text: string | null;
+  bathrooms: number | null;
+  address: string | null;
+  community: string | null;
+  cover_photo: string | null;
+};

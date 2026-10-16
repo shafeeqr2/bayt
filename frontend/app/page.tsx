@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { getFacets, getListings, type Facets } from "@/lib/api";
 import { ListingCard } from "./listing-card";
+import { MapSearchLoader } from "./map-search-loader";
 
 const PAGE_SIZE = 24;
 const ABOVE_THE_FOLD = 8; // Two rows of four on wide screens.
@@ -14,6 +15,7 @@ const FILTER_KEYS = [
   "min_beds",
   "min_baths",
   "sort",
+  "view",
 ] as const;
 
 type Filters = Partial<Record<(typeof FILTER_KEYS)[number], string>>;
@@ -26,8 +28,10 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     if (typeof value === "string" && value !== "") filters[key] = value;
   }
   const page = Math.max(1, Number(raw.page) || 1);
+  const mapView = filters.view === "map";
 
-  const query = new URLSearchParams(filters);
+  const apiFilters = Object.fromEntries(Object.entries(filters).filter(([key]) => key !== "view"));
+  const query = new URLSearchParams(apiFilters);
   query.set("limit", String(PAGE_SIZE));
   query.set("offset", String((page - 1) * PAGE_SIZE));
 
@@ -38,11 +42,16 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     <div className="space-y-6">
       <FilterBar filters={filters} facets={facets} />
 
-      <p className="text-sm text-muted">
-        {listings.total.toLocaleString("en-CA")} {listings.total === 1 ? "home" : "homes"}
-      </p>
+      <div className="flex items-center justify-between gap-4">
+        <p className="text-sm text-muted">
+          {listings.total.toLocaleString("en-CA")} {listings.total === 1 ? "home" : "homes"}
+        </p>
+        <ViewToggle filters={filters} mapView={mapView} />
+      </div>
 
-      {listings.items.length === 0 ? (
+      {mapView ? (
+        <MapSearchLoader query={new URLSearchParams(apiFilters).toString()} total={listings.total} />
+      ) : listings.items.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border py-20 text-center text-muted">
           No homes match these filters.
         </div>
@@ -54,8 +63,31 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         </div>
       )}
 
-      <Pagination filters={filters} page={page} pageCount={pageCount} />
+      {!mapView && <Pagination filters={filters} page={page} pageCount={pageCount} />}
     </div>
+  );
+}
+
+function ViewToggle({ filters, mapView }: { filters: Filters; mapView: boolean }) {
+  const href = (view: "list" | "map") => {
+    const params = new URLSearchParams(filters);
+    if (view === "map") params.set("view", "map");
+    else params.delete("view");
+    const qs = params.toString();
+    return qs ? `/?${qs}` : "/";
+  };
+  const base = "px-3 py-1.5 text-sm transition-colors";
+  const on = "bg-accent text-accent-foreground";
+  const off = "text-muted hover:text-foreground";
+  return (
+    <nav className="flex overflow-hidden rounded-lg border border-border bg-surface" aria-label="View">
+      <Link href={href("list")} className={`${base} ${mapView ? off : on}`} aria-current={mapView ? undefined : "page"}>
+        List
+      </Link>
+      <Link href={href("map")} className={`${base} ${mapView ? on : off}`} aria-current={mapView ? "page" : undefined}>
+        Map
+      </Link>
+    </nav>
   );
 }
 
@@ -65,6 +97,7 @@ const inputClass =
 function FilterBar({ filters, facets }: { filters: Filters; facets: Facets }) {
   return (
     <form className="grid grid-cols-2 gap-3 rounded-xl border border-border bg-surface p-4 md:grid-cols-4 lg:grid-cols-8">
+      {filters.view && <input type="hidden" name="view" value={filters.view} />}
       <input
         name="q"
         defaultValue={filters.q}

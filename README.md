@@ -52,9 +52,21 @@ The frontend talks to the API from the server side only, using `BACKEND_URL` (se
 If a port is already taken on your machine, change it in `.env` (created from `.env.example` on first run).
 Postgres is exposed on 5433 by default so it does not clash with a local Postgres on 5432.
 
+## Map search
+
+The search page has a List | Map toggle (`?view=map`).
+Map mode shows every home matching the filters as a price pin on a tilted MapLibre map over free [OpenFreeMap](https://openfreemap.org) tiles (no key, no request limits).
+Pins cluster when zoomed out; clicking a cluster zooms in and clicking a pin opens a card that links to the listing.
+The pins come from `GET /api/listings/map`, which takes the same filters as `GET /api/listings` but returns every match without paging, proxied to the browser by `frontend/app/api/pins/route.ts`.
+
+From zoom 14 the map extrudes buildings in 3D.
+Inside Toronto these are the city's own building outlines with LiDAR-measured heights, served as vector tiles straight from PostGIS by `GET /api/tiles/buildings/{z}/{x}/{y}` (`backend/app/city/tiles.py`) once `./start.sh city-data` has loaded them.
+Outside the city limits (`GET /api/city/boundary`) the map falls back to OpenStreetMap's buildings, which only have heights where someone has mapped them.
+
 ## City of Toronto data (zoning, lots, permits)
 
-Listing pages show the lot boundary and size, zoning, heritage status, and building permits for City of Toronto listings.
+Listing pages show the lot boundary and size, zoning, parking rules, heritage status, and building permits for City of Toronto listings.
+Parking rules come from Chapter 200 of By-law 569-2013 (`backend/app/city/parking.py`): since 2022 Toronto requires no parking for houses, houseplexes or secondary suites, and only caps resident parking in new apartment buildings by Parking Zone.
 That data comes from [Toronto Open Data](https://open.toronto.ca/) and is too large for git, so load it once:
 
 ```bash
@@ -68,6 +80,8 @@ Re-run it any time to refresh; files the city has not changed are not downloaded
 |---|---|---|
 | `address_points` | Address Points (Municipal) | ~525k |
 | `parcels` | Property Boundaries | ~500k |
+| `buildings` | Topographic Mapping - Building Outlines (every footprint with its LiDAR height; drives the 3D search map) | ~558k |
+| `boundary` | Regional Municipal Boundary (city limits, so the map knows where city buildings end) | 1 |
 | `zoning_area` + `zoning_*` overlays | Zoning By-law 569-2013 (zones, height, lot coverage, parking, policy areas, rooming houses) | ~17k |
 | `heritage` | Heritage Register | ~12k |
 | `permits_active`, `permits_cleared`, `permits_cleared_2000_2016` | Building Permits | ~1.1M |

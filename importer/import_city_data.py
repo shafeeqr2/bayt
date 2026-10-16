@@ -28,6 +28,10 @@ DATASETS = [
     ("zoning_policy_area", "zoning-by-law", "Zoning Policy Area Overlay - 4326.gpkg"),
     ("zoning_rooming_house", "zoning-by-law", "Zoning Rooming House Overlay - 4326.gpkg"),
     ("parcels", "property-boundaries", "Property Boundaries - 4326.gpkg"),
+    # Every building footprint with its LiDAR height, for the 3D search map (~200 MB).
+    ("buildings", "topographic-mapping-building-outlines", "Building Outlines - 4326.gpkg"),
+    # City limits, so the map knows where city buildings end and OpenStreetMap's begin.
+    ("boundary", "regional-municipal-boundary", "toronto-boundary-wgs84"),
     ("address_points", "address-points-municipal-toronto-one-address-repository", "Address Points - 4326.gpkg"),
     ("heritage", "heritage-register", "Heritage Register Data"),
     ("permits_active", "building-permits-active-permits", "building-permits-active-permits.csv"),

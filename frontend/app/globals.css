@@ -38,3 +38,49 @@ body {
   background: var(--background);
   color: var(--foreground);
 }
+
+/* Cards opened from pins on the search map. MapLibre renders them from HTML
+   strings, outside React, so they are styled here rather than with utilities. */
+.maplibregl-popup-content {
+  padding: 0;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  background: var(--surface);
+  color: var(--foreground);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.18);
+}
+.maplibregl-popup-anchor-top .maplibregl-popup-tip { border-bottom-color: var(--surface); }
+.maplibregl-popup-anchor-bottom .maplibregl-popup-tip { border-top-color: var(--surface); }
+.maplibregl-popup-anchor-left .maplibregl-popup-tip { border-right-color: var(--surface); }
+.maplibregl-popup-anchor-right .maplibregl-popup-tip { border-left-color: var(--surface); }
+.pin-card {
+  display: block;
+  width: 15rem;
+  text-decoration: none;
+  color: inherit;
+}
+.pin-card img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: var(--border);
+}
+.pin-card-body {
+  padding: 0.6rem 0.75rem 0.7rem;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+}
+.pin-card-price {
+  font-size: 1rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.pin-card-facts { font-variant-numeric: tabular-nums; }
+.pin-card-where {
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pin-card:hover .pin-card-price { color: var(--accent); }
