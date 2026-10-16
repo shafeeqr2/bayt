@@ -69,10 +69,33 @@ function bearingBetween([lon1, lat1]: Point, [lon2, lat2]: Point): number {
 function supportsWebGL(): boolean {
   try {
     const canvas = document.createElement("canvas");
-    return Boolean(canvas.getContext("webgl2") || canvas.getContext("webgl"));
+    const gl = canvas.getContext("webgl2") || canvas.getContext("webgl");
+    if (!gl) return false;
+    // Browsers cap live WebGL contexts per page; give this probe's back before MapLibre asks for one.
+    gl.getExtension("WEBGL_lose_context")?.loseContext();
+    return true;
   } catch {
     return false;
   }
+}
+
+/**
+ * Why WebGL is missing, as far as the page can tell, and the setting that brings it back.
+ * Chrome stopped falling back to software WebGL, so "Use graphics acceleration" off
+ * (the usual cause on a desktop) now means no WebGL at all.
+ */
+function webglHint(): string {
+  const ua = navigator.userAgent;
+  if (/Firefox\//.test(ua)) {
+    return "In Firefox, open Settings, search for “performance”, tick “Use recommended performance settings” (or “Use hardware acceleration when available”), then restart Firefox.";
+  }
+  if (/Chrome\//.test(ua) && !/Edg\//.test(ua)) {
+    return "In Chrome, open chrome://settings/system, turn on “Use graphics acceleration when available” and relaunch.";
+  }
+  if (/Edg\//.test(ua)) {
+    return "In Edge, open edge://settings/system, turn on “Use graphics acceleration when available” and restart.";
+  }
+  return "Turn on hardware (graphics) acceleration in the browser's settings and restart it.";
 }
 
 function cssColor(name: string, fallback: string): string {
@@ -214,8 +237,9 @@ export function LotScene({ parcel, buildings, nearbyBuildings, nearbyParcels, fr
 
   if (unsupported) {
     return (
-      <div className="flex h-40 items-center justify-center rounded-xl border border-border bg-surface p-4 text-center text-sm text-muted">
-        The 3D view needs WebGL, which this browser has turned off.
+      <div className="flex h-40 flex-col items-center justify-center gap-2 rounded-xl border border-border bg-surface p-4 text-center text-sm text-muted">
+        <p className="font-medium text-foreground">The 3D view needs WebGL, which this browser has turned off.</p>
+        <p className="max-w-prose">{webglHint()}</p>
       </div>
     );
   }

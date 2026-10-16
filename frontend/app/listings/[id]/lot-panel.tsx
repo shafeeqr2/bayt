@@ -8,9 +8,9 @@ import { LotSceneLoader } from "./lot-scene-loader";
  * yard once the lot analysis is in; until then (or outside Toronto) the parcel
  * boundary alone.
  */
-export async function LotMapCell({ id, city }: { id: string; city: CityData }) {
+export async function LotMapCell({ id, city }: { id: string; city: CityData | null }) {
   const lot = await getLotAnalysis(id);
-  if (!lot) return <ParcelOnly geojson={city.lot_geojson} />;
+  if (!lot) return <ParcelOnly geojson={city?.lot_geojson ?? null} />;
 
   const { geometry } = lot;
   return (
@@ -30,14 +30,17 @@ export async function LotMapCell({ id, city }: { id: string; city: CityData }) {
   );
 }
 
-/** The lot in 3D with the neighbours and the zoning height limit. Nothing outside Toronto. */
-export async function LotSceneSection({ id, city }: { id: string; city: CityData }) {
+/**
+ * The lot in 3D with the neighbours and the zoning height limit. Nothing outside Toronto.
+ * Without city open data (`city` null) the scene still renders, minus the height envelope.
+ */
+export async function LotSceneSection({ id, city }: { id: string; city: CityData | null }) {
   const lot = await getLotAnalysis(id);
   if (!lot) return null;
 
   const { geometry } = lot;
-  const limit = city.height_limit_m;
-  const storeys = city.height_limit_storeys;
+  const limit = city?.height_limit_m ?? null;
+  const storeys = city?.height_limit_storeys ?? null;
   return (
     <div className="space-y-2">
       <LotSceneLoader
@@ -59,8 +62,9 @@ export async function LotSceneSection({ id, city }: { id: string; city: CityData
           ) : null}
         </ul>
         <p>
-          Heights from the city&apos;s LiDAR survey. The height limit is drawn over the whole lot; setbacks are not.
-          Drag to rotate, Ctrl + scroll to zoom.
+          Heights from the city&apos;s LiDAR survey.
+          {limit ? " The height limit is drawn over the whole lot; setbacks are not." : ""} Drag to rotate, Ctrl +
+          scroll to zoom.
         </p>
       </div>
     </div>
@@ -87,7 +91,7 @@ function Legend({ swatch, children }: { swatch: string; children: React.ReactNod
 }
 
 /** How much of the lot the buildings take up, against the zoning cap. */
-export async function CoverageFacts({ id }: { id: string }) {
+export async function CoverageFacts({ id, divider = true }: { id: string; divider?: boolean }) {
   const lot = await getLotAnalysis(id);
   if (!lot) return null;
 
@@ -96,7 +100,7 @@ export async function CoverageFacts({ id }: { id: string }) {
   const overCap = allowed != null && coverage.coverage_pct > allowed;
 
   return (
-    <div className="space-y-3 border-t border-border pt-5">
+    <div className={divider ? "space-y-3 border-t border-border pt-5" : "space-y-3"}>
       <div className="flex items-baseline justify-between gap-4">
         <p className="text-sm text-muted">Lot coverage</p>
         <p className="text-sm tabular-nums">

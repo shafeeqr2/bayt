@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 
-import { getCityData, type CityData, type Permit } from "@/lib/api";
+import { getCityData, getLotAnalysis, type CityData, type Permit } from "@/lib/api";
 import { formatArea, formatDate, formatMetres, formatPrice } from "@/lib/format";
 import { CoverageFacts, LotMapCell, LotSceneSection, ParcelOnly } from "./lot-panel";
 
@@ -9,7 +9,7 @@ const MULTIPLEX_ZONES = new Set(["R", "RD", "RS", "RT", "RM"]);
 
 export async function CitySection({ id }: { id: string }) {
   const city = await getCityData(id);
-  if (!city) return null;
+  if (!city) return <LotOnlySection id={id} />;
 
   return (
     <section className="space-y-6">
@@ -49,6 +49,37 @@ export async function CitySection({ id }: { id: string }) {
       </Suspense>
 
       <Permits permits={city.permits} />
+    </section>
+  );
+}
+
+/**
+ * The lot analysis on its own, for when City of Toronto open data has not been loaded
+ * (`./start.sh city-data`). It comes straight from the city's GIS, so the lot map,
+ * coverage and 3D view still work; zoning, heritage and permits need the open data.
+ */
+async function LotOnlySection({ id }: { id: string }) {
+  const lot = await getLotAnalysis(id);
+  if (!lot) return null;
+
+  return (
+    <section className="space-y-6">
+      <div className="space-y-1">
+        <h2 className="text-lg font-semibold">Lot</h2>
+        <p className="text-sm text-muted">
+          From the City of Toronto&apos;s GIS. Zoning, heritage and building permits appear once the city&apos;s open
+          data has been loaded.
+        </p>
+      </div>
+
+      <div className="grid gap-6 rounded-xl border border-border bg-surface p-5 md:grid-cols-[15rem_minmax(0,1fr)]">
+        <LotMapCell id={id} city={null} />
+        <div className="space-y-5">
+          <CoverageFacts id={id} divider={false} />
+        </div>
+      </div>
+
+      <LotSceneSection id={id} city={null} />
     </section>
   );
 }
