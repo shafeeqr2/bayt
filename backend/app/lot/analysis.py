@@ -26,7 +26,9 @@ from shapely.geometry.base import BaseGeometry
 from shapely.ops import linemerge, transform, unary_union
 
 from app.lot.schemas import (
+    BuildingFeature,
     BuildingInfo,
+    BuildingProperties,
     CoverageInfo,
     GardenSuiteInfo,
     LotAnalysis,
@@ -316,25 +318,46 @@ def analyze(inputs: LotInputs) -> LotAnalysis:
     building_infos: list[BuildingInfo] = []
     main_pieces: list[BaseGeometry] = []
     ancillary_pieces: list[BaseGeometry] = []
-    clipped_wgs: list[dict] = []
-    for f in inputs.buildings:
-        clip = to_m(f.geometry).intersection(parcel_m)
-        if clip.is_empty or clip.area < SLIVER_M2:
-            continue
-        kind = f.properties.get("SUBTYPE_DESC") or "Building"
-        is_main = kind == "Building Outline"
-        (main_pieces if is_main else ancillary_pieces).append(clip)
+    on_lot_features: list[BuildingFeature] = []
+    nearby_features: list[BuildingFeature] = []
+
+    def building_feature(geom_m: BaseGeometry, f: Feature, *, on_lot: bool) -> BuildingFeature:
         h = f.properties.get("DERIVED_HEIGHT")
-        building_infos.append(
-            BuildingInfo(
+        kind = f.properties.get("SUBTYPE_DESC") or "Building"
+        return BuildingFeature(
+            geometry=mapping(to_deg(geom_m)),
+            properties=BuildingProperties(
                 building_id=f.properties.get("BUILDINGID"),
                 kind=kind,
-                footprint_m2=round(clip.area, 1),
+                is_main=kind == "Building Outline",
                 height_m=_r(float(h)) if h not in (None, "") else None,
-                is_main=is_main,
+                on_lot=on_lot,
+            ),
+        )
+
+    for f in inputs.buildings:
+        geom_m = to_m(f.geometry)
+        clip = geom_m.intersection(parcel_m)
+        if clip.is_empty or clip.area < SLIVER_M2:
+            continue
+        feature = building_feature(clip, f, on_lot=True)
+        (main_pieces if feature.properties.is_main else ancillary_pieces).append(clip)
+        building_infos.append(
+            BuildingInfo(
+                building_id=feature.properties.building_id,
+                kind=feature.properties.kind,
+                footprint_m2=round(clip.area, 1),
+                height_m=feature.properties.height_m,
+                is_main=feature.properties.is_main,
             )
         )
-        clipped_wgs.append(mapping(to_deg(clip)))
+        on_lot_features.append(feature)
+        # A semi or row house straddles the lot line: the neighbour's half is context, not coverage.
+        rest = geom_m.difference(parcel_m)
+        if not rest.is_empty and rest.area >= SLIVER_M2:
+            nearby_features.append(building_feature(rest, f, on_lot=False))
+    for f in inputs.nearby_buildings:
+        nearby_features.append(building_feature(to_m(f.geometry), f, on_lot=False))
     main = unary_union(main_pieces) if main_pieces else None
     ancillary = unary_union(ancillary_pieces) if ancillary_pieces else None
     footprint = unary_union([g for g in (main, ancillary) if g is not None]) if (main or ancillary) else None
@@ -434,7 +457,9 @@ def analyze(inputs: LotInputs) -> LotAnalysis:
         garden_suite=garden,
         geometry=LotGeometry(
             parcel=mapping(to_deg(parcel_m)),
-            buildings=clipped_wgs,
+            buildings=on_lot_features,
+            nearby_buildings=nearby_features,
+            nearby_parcels=[mapping(f.geometry) for f in inputs.neighbours],
             frontage=mapping(to_deg(frontage_line)) if frontage_line else None,
             rear_yard=mapping(to_deg(rear_yard_m)) if rear_yard_m is not None and not rear_yard_m.is_empty else None,
         ),

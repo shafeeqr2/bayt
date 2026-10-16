@@ -123,6 +123,13 @@ export type GeoArea = GeoPolygon | GeoMultiPolygon;
 
 export type Verdict = "likely" | "possible" | "unlikely" | "not_applicable" | "unknown";
 
+/** A building footprint with the city's LiDAR-derived height, as a GeoJSON Feature. */
+export type BuildingFeature = {
+  type: "Feature";
+  geometry: GeoArea;
+  properties: { building_id: number | null; kind: string; is_main: boolean; height_m: number | null; on_lot: boolean };
+};
+
 /** What the backend computed from the city's parcel, building and zoning layers. */
 export type LotAnalysis = {
   parcel: {
@@ -166,7 +173,11 @@ export type LotAnalysis = {
   garden_suite: { verdict: Verdict; max_footprint_m2: number | null; notes: string[] };
   geometry: {
     parcel: GeoArea;
-    buildings: GeoArea[];
+    /** Footprints on the parcel, clipped to it. */
+    buildings: BuildingFeature[];
+    /** Footprints within about 75 m, with any part on the parcel removed. */
+    nearby_buildings: BuildingFeature[];
+    nearby_parcels: GeoArea[];
     frontage: GeoLineString | null;
     rear_yard: GeoArea | null;
   };

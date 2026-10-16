@@ -39,6 +39,8 @@ LAYERS = {
     "centreline": f"{BASE}/cot_geospatial/FeatureServer/2",
 }
 
+NEARBY_M = 75  # how far around the parcel to collect building footprints for the 3D view
+
 # Centreline FEATURE_CODE_DESC values that are streets a lot can front onto.
 STREET_CODES = {
     "Local",
@@ -74,6 +76,7 @@ class LotInputs:
     lot_coverage: Feature | None
     centrelines: list[Feature]  # street + laneway centrelines within ~60 m
     sixplex: Feature | None
+    nearby_buildings: list[Feature] = field(default_factory=list)  # other footprints within NEARBY_M, for the 3D view
 
 
 class TorontoGIS:
@@ -204,8 +207,9 @@ class TorontoGIS:
             out_fields="PARCELID,FEATURE_TYPE,ADDRESS_NUMBER,LINEAR_NAME_FULL,STATEDAREA",
         )
 
-    def buildings_intersecting(self, parcel: BaseGeometry) -> list[Feature]:
-        geometry, gtype = self._polygon(parcel)
+    def buildings_near(self, parcel: BaseGeometry, distance_m: float = NEARBY_M) -> list[Feature]:
+        """Every building footprint within `distance_m` of the parcel, the parcel's own included."""
+        geometry, gtype = self._envelope(parcel, distance_m)
         return self._query(
             "buildings",
             geometry=geometry,
@@ -247,10 +251,13 @@ class TorontoGIS:
             return None
         pid = parcel.properties.get("PARCELID")
         c = parcel.geometry.representative_point()
+        buildings = self.buildings_near(parcel.geometry)
+        on_lot = [f for f in buildings if f.geometry.intersects(parcel.geometry)]
         return LotInputs(
             parcel=parcel,
             neighbours=[f for f in self.parcels_near(parcel.geometry) if f.properties.get("PARCELID") != pid],
-            buildings=self.buildings_intersecting(parcel.geometry),
+            buildings=on_lot,
+            nearby_buildings=[f for f in buildings if f not in on_lot],
             zoning=self.zoning_at(c.y, c.x),
             lot_coverage=self.lot_coverage_at(c.y, c.x),
             centrelines=self.centrelines_near(parcel.geometry),

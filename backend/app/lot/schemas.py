@@ -89,11 +89,29 @@ class GardenSuiteInfo(BaseModel):
     notes: list[str]
 
 
+class BuildingProperties(BaseModel):
+    building_id: int | None
+    kind: str
+    is_main: bool
+    height_m: float | None = Field(None, description="LiDAR-derived height above ground")
+    on_lot: bool = Field(description="True for footprints on this parcel (clipped to it); False for neighbours")
+
+
+class BuildingFeature(BaseModel):
+    """GeoJSON Feature: a footprint polygon with its height, ready to extrude."""
+
+    type: Literal["Feature"] = "Feature"
+    geometry: dict[str, Any]
+    properties: BuildingProperties
+
+
 class LotGeometry(BaseModel):
-    """GeoJSON (WGS84) for drawing the lot."""
+    """GeoJSON (WGS84) for drawing the lot in 2D and 3D."""
 
     parcel: dict[str, Any]
-    buildings: list[dict[str, Any]]
+    buildings: list[BuildingFeature] = Field(description="Footprints on the parcel, clipped to it")
+    nearby_buildings: list[BuildingFeature] = Field(description="Footprints within about 75 m, parts on the parcel removed")
+    nearby_parcels: list[dict[str, Any]] = Field(description="Neighbouring parcel polygons within about 100 m")
     frontage: dict[str, Any] | None
     rear_yard: dict[str, Any] | None
 

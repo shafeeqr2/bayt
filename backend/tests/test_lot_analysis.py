@@ -254,3 +254,22 @@ def test_side_setback_table():
 def test_parse_stated_area():
     assert analysis.parse_stated_area("464.3631592 sq.m") == pytest.approx(464.36, abs=0.01)
     assert analysis.parse_stated_area(None) is None
+
+
+def test_geometry_carries_heights_and_splits_straddling_buildings():
+    parcel, nbs = block([12.0] * 5, target=2)
+    # A semi: one outline straddling the lot line with the west neighbour (x 18..30 over lots 1 and 2).
+    semi = house(18, 12.0, 10.0, BUILDINGID=7, DERIVED_HEIGHT=8.1)
+    far = house(60, 8.0, 10.0, BUILDINGID=8, DERIVED_HEIGHT=6.5)  # on a lot further east
+    lot_inputs = inputs(parcel, nbs, [semi], zoning(), coverage_overlay(35))
+    lot_inputs.nearby_buildings = [far]
+    r = analyze(lot_inputs)
+
+    (ours,) = r.geometry.buildings
+    assert ours.properties.on_lot and ours.properties.height_m == 8.1 and ours.properties.building_id == 7
+    assert r.coverage.main_building_m2 == pytest.approx(6.0 * 10.0, abs=0.5)  # only our half counts
+
+    by_id = {b.properties.building_id: b for b in r.geometry.nearby_buildings}
+    assert set(by_id) == {7, 8}
+    assert not by_id[7].properties.on_lot and by_id[8].properties.height_m == 6.5
+    assert len(r.geometry.nearby_parcels) == len(nbs)

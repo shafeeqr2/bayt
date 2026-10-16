@@ -6,6 +6,7 @@ import re
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.lot.analysis import analyze
@@ -44,7 +45,10 @@ def analyze_listing(
         raise ListingNotLocated("Listing has no coordinates.")
     cached = session.get(LotAnalysisCache, listing.id)
     if cached and not refresh and datetime.now(timezone.utc) - cached.computed_at < CACHE_TTL:
-        return LotAnalysis.model_validate(cached.result)
+        try:
+            return LotAnalysis.model_validate(cached.result)
+        except ValidationError:
+            pass  # computed by an older version of the analysis; recompute below
 
     result = analyze_point(listing.latitude, listing.longitude, gis)
     _cross_check_listing(result, listing)

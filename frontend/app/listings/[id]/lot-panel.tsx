@@ -1,6 +1,7 @@
 import { getLotAnalysis, type CityData, type LotAnalysis } from "@/lib/api";
 import { formatArea } from "@/lib/format";
 import { LotMap } from "./lot-map";
+import { LotSceneLoader } from "./lot-scene-loader";
 
 /**
  * The lot drawing. Shows the house and garage footprints, front lot line and rear
@@ -14,12 +15,54 @@ export async function LotMapCell({ id, city }: { id: string; city: CityData }) {
   const { geometry } = lot;
   return (
     <div className="space-y-2">
-      <LotMap parcel={geometry.parcel} buildings={geometry.buildings} frontage={geometry.frontage} rearYard={geometry.rear_yard} />
+      <LotMap
+        parcel={geometry.parcel}
+        buildings={geometry.buildings.map((b) => b.geometry)}
+        frontage={geometry.frontage}
+        rearYard={geometry.rear_yard}
+      />
       <ul className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted">
         <Legend swatch="bg-foreground/75">Buildings</Legend>
         <Legend swatch="bg-accent">Front lot line</Legend>
         {geometry.rear_yard && <Legend swatch="border border-dashed border-accent/60 bg-accent/15">Rear yard</Legend>}
       </ul>
+    </div>
+  );
+}
+
+/** The lot in 3D with the neighbours and the zoning height limit. Nothing outside Toronto. */
+export async function LotSceneSection({ id, city }: { id: string; city: CityData }) {
+  const lot = await getLotAnalysis(id);
+  if (!lot) return null;
+
+  const { geometry } = lot;
+  const limit = city.height_limit_m;
+  const storeys = city.height_limit_storeys;
+  return (
+    <div className="space-y-2">
+      <LotSceneLoader
+        parcel={geometry.parcel}
+        buildings={geometry.buildings}
+        nearbyBuildings={geometry.nearby_buildings}
+        nearbyParcels={geometry.nearby_parcels}
+        frontage={geometry.frontage}
+        heightLimitM={limit}
+      />
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-1 text-xs text-muted">
+        <ul className="flex flex-wrap gap-x-3 gap-y-1">
+          <Legend swatch="bg-accent">This property</Legend>
+          <Legend swatch="bg-[#bdb6af] dark:bg-[#5a544f]">Neighbours</Legend>
+          {limit ? (
+            <Legend swatch="bg-[#2563eb]/50 dark:bg-[#60a5fa]/50">
+              Height limit {limit} m{storeys ? ` (${storeys} storeys)` : ""}
+            </Legend>
+          ) : null}
+        </ul>
+        <p>
+          Heights from the city&apos;s LiDAR survey. The height limit is drawn over the whole lot; setbacks are not.
+          Drag to rotate, Ctrl + scroll to zoom.
+        </p>
+      </div>
     </div>
   );
 }

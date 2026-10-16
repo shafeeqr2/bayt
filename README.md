@@ -146,6 +146,7 @@ Read the `coverage` object in the response. For 17 Hollydene Rd (listing `304033
 
 Each footprint is also listed under `buildings` with its area, height and type, and the polygons for the parcel, buildings, front lot line and rear yard are in `geometry` as GeoJSON for drawing on a map.
 The listing page draws exactly that: the lot to scale with the building footprints, front lot line and rear yard, next to the coverage figures against the zoning cap.
+Below it, a 3D view extrudes the house and every building within about 75 m to the city's LiDAR heights (`geometry.buildings` and `geometry.nearby_buildings` carry `height_m`), over a free [OpenFreeMap](https://openfreemap.org) basemap, with the zoning height limit drawn as a translucent ceiling over the lot.
 
 "Open" means not built on. Driveways, patios and pools are not in the footprint data, so open land is not necessarily green.
 

@@ -70,6 +70,10 @@ Verdicts are `likely`, `possible` (within 10% of a minimum, or blocked only by a
 The listing page's "Lot & zoning" section draws the parcel, building footprints, front lot line and rear yard to scale and shows the coverage figures against the zoning cap.
 It falls back to the parcel outline alone while the analysis loads, outside Toronto, or when the city's GIS is down.
 
+Under it, a 3D view (MapLibre GL JS over OpenFreeMap tiles, both free and keyless) extrudes the house and its neighbours to the heights in the city's building outlines and floats the zoning height limit as a thin slab over the lot, so a buyer can see what "9 m, 2 storeys" means against the street.
+For that, `geometry.buildings` and `geometry.nearby_buildings` are GeoJSON Features with `height_m`, `kind` and `is_main`; nearby footprints come from one envelope query 75 m around the parcel, and a building that straddles the lot line (a semi) is split so only our half counts towards coverage while the neighbour's half still shows in 3D.
+Nothing underground is drawn: the city's watermain and sewer layers exist as open data but say nothing a buyer acts on from a map; watermain age and nearby break counts would be worth adding as facts instead.
+
 `./start.sh lot-analysis` (`python -m app.lot.backfill`) precomputes the analysis for every Toronto listing so pages never wait on the city.
 It skips listings with a fresh cached result, counts the ones the city cannot place on an ordinary parcel (condos), and leaves failures uncached so a re-run retries them.
 Queries are sent as POST: the city's firewall rejects GET URLs carrying a parcel polygon with more than a few dozen vertices.
@@ -77,4 +81,5 @@ Queries are sent as POST: the city's firewall rejects GET URLs carrying a parcel
 ## Next steps
 
 - Show the severance and garden-suite verdicts on the listing page, and let search filter on them.
+- Watermain facts (material, install year, breaks nearby) from Toronto Water's open data.
 - Add other municipalities' open data behind `LotInputs`.

@@ -2,7 +2,7 @@ import { Suspense } from "react";
 
 import { getCityData, type CityData, type Permit } from "@/lib/api";
 import { formatArea, formatDate, formatMetres, formatPrice } from "@/lib/format";
-import { CoverageFacts, LotMapCell, ParcelOnly } from "./lot-panel";
+import { CoverageFacts, LotMapCell, LotSceneSection, ParcelOnly } from "./lot-panel";
 
 // Zones where Toronto has allowed up to four units as-of-right since May 2023.
 const MULTIPLEX_ZONES = new Set(["R", "RD", "RS", "RT", "RM"]);
@@ -43,6 +43,10 @@ export async function CitySection({ id }: { id: string }) {
           <Zoning city={city} />
         </div>
       </div>
+
+      <Suspense fallback={null}>
+        <LotSceneSection id={id} city={city} />
+      </Suspense>
 
       <Permits permits={city.permits} />
     </section>
