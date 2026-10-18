@@ -23,6 +23,8 @@ Later runs reuse the database and start in seconds.
 
 ## How it fits together
 
+See [docs/architecture.md](docs/architecture.md) for a diagram of the services and the external data sources they call.
+
 | Part | Tech | Runs in |
 |---|---|---|
 | `frontend/` | Next.js 16 (App Router, Tailwind) | Your machine, via `./start.sh` |
