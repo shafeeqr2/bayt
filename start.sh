@@ -15,7 +15,13 @@ compose() { docker compose "$@"; }
 
 check_docker() {
   command -v docker >/dev/null 2>&1 || fail "Docker is not installed. Install Docker Desktop: https://www.docker.com/products/docker-desktop/"
-  docker info >/dev/null 2>&1 || fail "Docker is installed but not running. Start Docker Desktop and try again."
+  local docker_info
+  if ! docker_info="$(docker info 2>&1)"; then
+    if grep -qi "permission denied" <<<"$docker_info"; then
+      fail "Docker is running but your user may not access it. On Linux run: sudo usermod -aG docker \$USER, then log out and back in (or run 'newgrp docker')."
+    fi
+    fail "Docker is installed but not running. Start Docker Desktop and try again."
+  fi
   docker compose version >/dev/null 2>&1 || fail "Docker Compose v2 is missing. Update Docker Desktop."
 }
 
