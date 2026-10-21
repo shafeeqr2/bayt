@@ -15,6 +15,7 @@ const FILTER_KEYS = [
   "min_beds",
   "min_baths",
   "sort",
+  "potential",
   "view",
 ] as const;
 

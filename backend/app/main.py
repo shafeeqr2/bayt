@@ -2,8 +2,8 @@ from typing import Annotated, Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import func, select, text
-from sqlalchemy.orm import Session
+from sqlalchemy import Select, func, select, text
+from sqlalchemy.orm import Session, contains_eager
 
 from app.city.parking import parking_rules
 from app.city.permits import permits_for
@@ -11,10 +11,27 @@ from app.city.tiles import MAX_ZOOM, MIN_ZOOM, building_tile, buildings_loaded, 
 from app.city.zones import zone_label, zone_rules
 from app.config import settings
 from app.db import get_session
+from app.lot import floorplan
 from app.lot import service as lot_service
+from app.lot.floorplan import FloorPlanResult
 from app.lot.schemas import LotAnalysis
-from app.models import Listing, ListingCityData
-from app.schemas import CityData, Facets, ListingDetail, ListingPage, ListingSummary, MapPin, ZoneRule
+from app.models import Listing, ListingCityData, ListingInvestment
+from app.schemas import (
+    CityData,
+    Facets,
+    InvestmentDetail,
+    ListingDetail,
+    ListingPage,
+    ListingSummary,
+    MapPin,
+    ParsedStrategy,
+    StrategyDefaults,
+    ZoneRule,
+)
+from app.strategy import estimate as strategy_estimate
+from app.strategy import parse as strategy_parse
+from app.strategy import search as strategy
+from app.strategy.finance import Financing
 
 app = FastAPI(title="Bayt API")
 app.add_middleware(
@@ -25,12 +42,14 @@ app.add_middleware(
 )
 
 SessionDep = Annotated[Session, Depends(get_session)]
+FinancingDep = Annotated[Financing, Depends(strategy.financing_params)]
 
 SORTS = {
     "newest": Listing.source_updated_at.desc().nulls_last(),
     "price_asc": Listing.price.asc(),
     "price_desc": Listing.price.desc(),
 }
+Sort = Literal["newest", "price_asc", "price_desc", "cap_rate_desc", "cash_flow_desc", "yield_desc"]
 
 
 def _cover(listing: Listing) -> str | None:
@@ -38,10 +57,18 @@ def _cover(listing: Listing) -> str | None:
     return listing.photos[0]["high"] if listing.photos else None
 
 
-def _summary(listing: Listing) -> ListingSummary:
+def _summary(listing: Listing, fin: Financing) -> ListingSummary:
     return ListingSummary.model_validate(listing, from_attributes=True).model_copy(
-        update={"cover_photo": _cover(listing)}
+        update={
+            "cover_photo": _cover(listing),
+            "investment": strategy.summary(listing.investment_estimate, listing.price, fin),
+        }
     )
+
+
+def _with_investment(stmt: Select) -> Select:
+    """Every search joins the investment estimate so returns can be filtered and sorted in SQL."""
+    return stmt.outerjoin(ListingInvestment, ListingInvestment.listing_id == Listing.id)
 
 
 @app.get("/api/health")
@@ -51,6 +78,7 @@ def health(session: SessionDep) -> dict[str, str]:
 
 
 def listing_filters(
+    fin: FinancingDep,
     city: str | None = None,
     building_type: str | None = None,
     min_price: Annotated[int | None, Query(ge=0)] = None,
@@ -58,9 +86,27 @@ def listing_filters(
     min_beds: Annotated[int | None, Query(ge=0)] = None,
     min_baths: Annotated[int | None, Query(ge=0)] = None,
     q: str | None = None,
+    # Investment strategy. Returns use the estimate in `listing_investment`;
+    # cash flow and affordability also use the financing parameters.
+    min_cap_rate: Annotated[float | None, Query(ge=-100, le=100)] = None,
+    min_gross_yield: Annotated[float | None, Query(ge=0, le=100)] = None,
+    min_cash_flow: Annotated[int | None, Query(description="Monthly, after the mortgage; may be negative")] = None,
+    income: Annotated[int | None, Query(ge=0, description="Annual household income for qualifying")] = None,
+    monthly_debts: Annotated[int, Query(ge=0)] = 0,
+    occupancy: strategy.Occupancy = "rent_out",
+    potential: Annotated[list[strategy.PotentialKey] | None, Query()] = None,
 ) -> list:
     """The search filters, shared by the list and the map so both agree on what matches."""
-    filters = []
+    filters = strategy.strategy_filters(
+        fin,
+        min_cap_rate=min_cap_rate,
+        min_gross_yield=min_gross_yield,
+        min_cash_flow=min_cash_flow,
+        income=income,
+        monthly_debts=monthly_debts,
+        occupancy=occupancy,
+        potential=potential,
+    )
     if city:
         filters.append(Listing.city == city)
     if building_type:
@@ -90,20 +136,23 @@ FiltersDep = Annotated[list, Depends(listing_filters)]
 def list_listings(
     session: SessionDep,
     filters: FiltersDep,
-    sort: Literal["newest", "price_asc", "price_desc"] = "newest",
+    fin: FinancingDep,
+    sort: Sort = "newest",
     limit: Annotated[int, Query(ge=1, le=100)] = 24,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> ListingPage:
-    total = session.scalar(select(func.count()).select_from(Listing).where(*filters)) or 0
+    total = session.scalar(_with_investment(select(func.count()).select_from(Listing)).where(*filters)) or 0
+    order = SORTS.get(sort) if sort in SORTS else strategy.strategy_sort(sort, fin)
     rows = session.scalars(
-        select(Listing)
+        _with_investment(select(Listing))
+        .options(contains_eager(Listing.investment_estimate))
         .where(*filters)
-        .order_by(SORTS[sort], Listing.id)
+        .order_by(order, Listing.id)
         .limit(limit)
         .offset(offset)
     ).all()
     return ListingPage(
-        items=[_summary(r) for r in rows], total=total, limit=limit, offset=offset
+        items=[_summary(r, fin) for r in rows], total=total, limit=limit, offset=offset
     )
 
 
@@ -121,7 +170,7 @@ def facets(session: SessionDep) -> Facets:
 def map_pins(session: SessionDep, filters: FiltersDep) -> list[MapPin]:
     """Every listing matching the filters, as pins for the search map (no paging)."""
     rows = session.scalars(
-        select(Listing)
+        _with_investment(select(Listing))
         .where(Listing.latitude.is_not(None), Listing.longitude.is_not(None), *filters)
         .order_by(Listing.price.desc(), Listing.id)
     ).all()
@@ -133,13 +182,42 @@ def map_pins(session: SessionDep, filters: FiltersDep) -> list[MapPin]:
     ]
 
 
+@app.get("/api/strategy/defaults")
+def strategy_defaults() -> StrategyDefaults:
+    """Default financing, the assumptions behind every estimate, and example strategies."""
+    return strategy.defaults()
+
+
+@app.get("/api/strategy/parse")
+def parse_strategy(session: SessionDep, text: Annotated[str, Query(max_length=1000)]) -> ParsedStrategy:
+    """Turn a strategy in plain language into search parameters, with each interpretation spelled out."""
+    communities = list(session.scalars(select(Listing.community).where(Listing.community.is_not(None)).distinct()))
+    parsed = strategy_parse.parse_strategy(text, communities)
+    return ParsedStrategy(params=parsed.params, understood=parsed.understood, unmatched=parsed.unmatched)
+
+
+@app.get("/api/listings/{listing_id}/investment")
+def get_listing_investment(listing_id: str, session: SessionDep, fin: FinancingDep) -> InvestmentDetail:
+    """Rent, operating costs, returns, cash needed and value-add potential at the given financing."""
+    listing = session.get(Listing, listing_id)
+    if listing is None:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    row = session.get(ListingInvestment, listing_id)
+    if row is None or row.model_version != strategy_estimate.MODEL_VERSION:
+        row = strategy_estimate.refresh(session, listing)
+    return strategy.detail(listing, row, fin)
+
+
 @app.get("/api/listings/{listing_id}")
 def get_listing(listing_id: str, session: SessionDep) -> ListingDetail:
     listing = session.get(Listing, listing_id)
     if listing is None:
         raise HTTPException(status_code=404, detail="Listing not found")
     return ListingDetail.model_validate(listing, from_attributes=True).model_copy(
-        update={"cover_photo": _cover(listing)}
+        update={
+            "cover_photo": _cover(listing),
+            "investment": strategy.summary(listing.investment_estimate, listing.price, Financing()),
+        }
     )
 
 
@@ -219,6 +297,28 @@ def get_listing_lot(listing_id: str, session: SessionDep, refresh: bool = False)
         return lot_service.analyze_listing(session, listing, refresh=refresh)
     except (lot_service.NotInCoverage, lot_service.ListingNotLocated, lot_service.GISError) as exc:
         raise _lot_errors(exc) from exc
+
+
+@app.get("/api/listings/{listing_id}/floorplan")
+def get_listing_floorplan(listing_id: str, session: SessionDep) -> FloorPlanResult:
+    """A possible floor plan: the listed rooms fitted into the city's building outline, level by level."""
+    listing = session.get(Listing, listing_id)
+    if listing is None:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    outside = "Building outlines come from City of Toronto data, which does not cover this address."
+    if listing.city != "Toronto":
+        return FloorPlanResult(plan=None, reason=outside)
+    try:
+        lot = lot_service.analyze_listing(session, listing)
+        return FloorPlanResult(plan=floorplan.floor_plan_for(listing, lot))
+    except lot_service.NotInCoverage:
+        return FloorPlanResult(plan=None, reason=outside)
+    except lot_service.ListingNotLocated:
+        return FloorPlanResult(plan=None, reason="The listing has no map location, so its building outline cannot be found.")
+    except lot_service.GISError:
+        return FloorPlanResult(plan=None, reason="The city's map service did not answer; try again later.")
+    except floorplan.NoPlan as exc:
+        return FloorPlanResult(plan=None, reason=str(exc))
 
 
 @app.get("/api/lot")

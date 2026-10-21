@@ -27,10 +27,20 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col font-sans">
         <header className="border-b border-border bg-surface">
           <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6">
-            <Link href="/" className="text-lg font-semibold tracking-tight">
-              Bayt
-            </Link>
-            <span className="text-sm text-muted">Toronto homes for sale</span>
+            <div className="flex items-center gap-6">
+              <Link href="/" className="text-lg font-semibold tracking-tight">
+                Bayt
+              </Link>
+              <nav className="flex items-center gap-4 text-sm" aria-label="Primary">
+                <Link href="/" className="text-muted hover:text-foreground">
+                  Homes
+                </Link>
+                <Link href="/invest" className="text-muted hover:text-foreground">
+                  Invest
+                </Link>
+              </nav>
+            </div>
+            <span className="hidden text-sm text-muted sm:inline">Toronto homes for sale</span>
           </div>
         </header>
         <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6">{children}</main>

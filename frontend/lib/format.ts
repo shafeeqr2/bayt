@@ -8,6 +8,15 @@ export function formatPrice(value: number): string {
   return currency.format(value);
 }
 
+/** "$1,250" or "−$612", with a real minus sign so negative cash flow reads at a glance. */
+export function formatSignedPrice(value: number): string {
+  return value < 0 ? `−${currency.format(-value)}` : currency.format(value);
+}
+
+export function formatPercent(value: number, digits = 1): string {
+  return `${value.toFixed(digits)}%`;
+}
+
 const n = (value: number) => value.toLocaleString("en-CA");
 
 /** Interior size is published as a range bucket, so show it as one. */

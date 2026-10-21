@@ -16,6 +16,25 @@ class Room(BaseModel):
     dimension: str | None
 
 
+class Potential(BaseModel):
+    """One way the buyer could add value, with the evidence for it."""
+
+    key: str  # suite | suite_potential | separate_entrance | garden_suite | severance | multiplex | extra_bedroom
+    label: str
+    detail: str
+
+
+class InvestmentSummary(BaseModel):
+    """Enough of the investment estimate to label a search result."""
+
+    rent_monthly: int
+    rent_source: str  # "listing" or "market"
+    gross_yield_pct: float
+    cap_rate_pct: float
+    cash_flow_monthly: int  # after the mortgage, at the financing in the request
+    potential: list[Potential]
+
+
 class ListingSummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -33,6 +52,7 @@ class ListingSummary(BaseModel):
     city: str | None
     community: str | None
     cover_photo: str | None = None
+    investment: InvestmentSummary | None = None
 
 
 class ListingDetail(ListingSummary):
@@ -82,6 +102,64 @@ class ListingPage(BaseModel):
 class Facets(BaseModel):
     cities: list[str]
     building_types: list[str]
+
+
+class FinancingOut(BaseModel):
+    down_payment_pct: float
+    down_payment: int | None
+    interest_rate: float
+    amortization: int
+
+
+class ExpenseBreakdown(BaseModel):
+    property_tax: int
+    condo_fees: int
+    insurance: int
+    maintenance: int
+    vacancy: int
+    total: int
+    tax_estimated: bool
+
+
+class InvestmentDetail(BaseModel):
+    """The full investment picture for one listing at a given financing."""
+
+    rent_monthly: int
+    rent_source: str
+    rent_note: str
+    units: int
+    gross_annual: int
+    expenses: ExpenseBreakdown
+    noi_annual: int
+    gross_yield_pct: float
+    cap_rate_pct: float
+
+    financing: FinancingOut
+    loan: int
+    mortgage_monthly: int
+    cash_flow_monthly: int
+    land_transfer_tax: int
+    closing_costs: int
+    cash_needed: int
+    cash_on_cash_pct: float | None
+    qualifying_rate: float
+    income_to_qualify: int
+
+    potential: list[Potential]
+    assumptions: list[str]
+
+
+class StrategyDefaults(BaseModel):
+    financing: FinancingOut
+    assumptions: list[str]
+    rent_source: str
+    examples: list[str]
+
+
+class ParsedStrategy(BaseModel):
+    params: dict[str, str | list[str]]
+    understood: list[str]
+    unmatched: list[str]
 
 
 class Permit(BaseModel):

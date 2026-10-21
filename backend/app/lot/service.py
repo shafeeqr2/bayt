@@ -13,6 +13,7 @@ from app.lot.analysis import analyze
 from app.lot.schemas import LotAnalysis
 from app.lot.toronto import GISError, TorontoGIS
 from app.models import Listing, LotAnalysisCache
+from app.strategy import estimate as strategy_estimate
 
 CACHE_TTL = timedelta(days=30)  # parcel/zoning data changes slowly; building outlines refresh quarterly
 
@@ -58,6 +59,8 @@ def analyze_listing(
     row.computed_at = result.computed_at
     session.add(row)
     session.commit()
+    # The garden suite and severance verdicts feed the strategy search.
+    strategy_estimate.refresh(session, listing)
     return result
 
 

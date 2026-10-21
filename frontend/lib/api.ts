@@ -2,6 +2,29 @@ import "server-only";
 
 import { BACKEND_URL } from "./backend";
 
+export type PotentialKey =
+  | "suite"
+  | "suite_potential"
+  | "separate_entrance"
+  | "garden_suite"
+  | "severance"
+  | "multiplex"
+  | "extra_bedroom";
+
+/** One way the buyer could add value, with the evidence for it. */
+export type Potential = { key: PotentialKey; label: string; detail: string };
+
+/** Enough of the investment estimate to label a search result. */
+export type InvestmentSummary = {
+  rent_monthly: number;
+  rent_source: "listing" | "market";
+  gross_yield_pct: number;
+  cap_rate_pct: number;
+  /** After the mortgage, at the financing in the request (or the defaults). */
+  cash_flow_monthly: number;
+  potential: Potential[];
+};
+
 export type ListingSummary = {
   id: string;
   mls_number: string | null;
@@ -17,6 +40,7 @@ export type ListingSummary = {
   city: string | null;
   community: string | null;
   cover_photo: string | null;
+  investment: InvestmentSummary | null;
 };
 
 export type ListingDetail = ListingSummary & {
@@ -65,6 +89,73 @@ export async function getFacets(): Promise<Facets> {
 
 export async function getListing(id: string): Promise<ListingDetail | null> {
   return get<ListingDetail>(`/api/listings/${encodeURIComponent(id)}`);
+}
+
+export type Financing = {
+  down_payment_pct: number;
+  down_payment: number | null;
+  interest_rate: number;
+  amortization: number;
+};
+
+export type InvestmentDetail = {
+  rent_monthly: number;
+  rent_source: "listing" | "market";
+  rent_note: string;
+  units: number;
+  gross_annual: number;
+  expenses: {
+    property_tax: number;
+    condo_fees: number;
+    insurance: number;
+    maintenance: number;
+    vacancy: number;
+    total: number;
+    tax_estimated: boolean;
+  };
+  noi_annual: number;
+  gross_yield_pct: number;
+  cap_rate_pct: number;
+  financing: Financing;
+  loan: number;
+  mortgage_monthly: number;
+  cash_flow_monthly: number;
+  land_transfer_tax: number;
+  closing_costs: number;
+  cash_needed: number;
+  cash_on_cash_pct: number | null;
+  qualifying_rate: number;
+  income_to_qualify: number;
+  potential: Potential[];
+  assumptions: string[];
+};
+
+/** The full investment picture for a listing; null when the listing is gone. */
+export async function getInvestment(id: string, financing?: URLSearchParams): Promise<InvestmentDetail | null> {
+  const qs = financing?.toString();
+  return get<InvestmentDetail>(`/api/listings/${encodeURIComponent(id)}/investment${qs ? `?${qs}` : ""}`);
+}
+
+export type StrategyDefaults = {
+  financing: Financing;
+  assumptions: string[];
+  rent_source: string;
+  examples: string[];
+};
+
+export async function getStrategyDefaults(): Promise<StrategyDefaults> {
+  return (await get<StrategyDefaults>("/api/strategy/defaults"))!;
+}
+
+/** Search parameters read out of a strategy written in plain language, with each reading spelled out. */
+export type ParsedStrategy = {
+  params: Record<string, string | string[]>;
+  understood: string[];
+  unmatched: string[];
+};
+
+export async function parseStrategy(text: string): Promise<ParsedStrategy> {
+  return (await get<ParsedStrategy>(`/api/strategy/parse?${new URLSearchParams({ text })}`))!;
 }
 
 export type Permit = {
@@ -193,6 +284,44 @@ export type LotAnalysis = {
  * Lot map and coverage computed from City of Toronto GIS layers.
  * null outside Toronto, for listings without coordinates, or while the city's GIS is unreachable.
  */
+export type PlanRoom = {
+  name: string;
+  short: string;
+  kind: "room" | "bathroom" | "stairs" | "garage";
+  /** True when the listing does not mention it and the plan adds it (stairs, bathrooms, garage). */
+  assumed: boolean;
+  /** Metres along the street and back from the front wall. */
+  x: number;
+  y: number;
+  width: number;
+  depth: number;
+  size: string | null;
+  /** Drawn at this share of the listed size so it fits; null when full size. */
+  scale: number | null;
+};
+
+export type PlanLevel = {
+  name: string;
+  outline: { type: "Polygon"; coordinates: [number, number][][] } | { type: "MultiPolygon"; coordinates: [number, number][][][] };
+  rooms: PlanRoom[];
+  not_placed: string[];
+  listed_area_m2: number;
+  floor_area_m2: number;
+};
+
+export type FloorPlan = {
+  width_m: number;
+  depth_m: number;
+  street_side_known: boolean;
+  levels: PlanLevel[];
+  notes: string[];
+};
+
+/** A possible floor plan fitted from the city's building outline and the listed rooms, or why there is none. */
+export async function getFloorPlan(id: string): Promise<{ plan: FloorPlan | null; reason: string | null } | null> {
+  return get(`/api/listings/${encodeURIComponent(id)}/floorplan`);
+}
+
 export async function getLotAnalysis(id: string): Promise<LotAnalysis | null> {
   const path = `/api/listings/${encodeURIComponent(id)}/lot`;
   const res = await fetch(`${BACKEND_URL}${path}`);

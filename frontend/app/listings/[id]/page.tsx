@@ -5,7 +5,9 @@ import { Suspense } from "react";
 import { getListing } from "@/lib/api";
 import { formatParking, formatPrice, formatSqft } from "@/lib/format";
 import { CitySection } from "./city-section";
+import { FloorPlanSection } from "./floor-plan";
 import { Gallery } from "./gallery";
+import { PotentialChips } from "../../potential-chips";
 
 export default async function ListingPage({ params }: PageProps<"/listings/[id]">) {
   const { id } = await params;
@@ -36,6 +38,8 @@ export default async function ListingPage({ params }: PageProps<"/listings/[id]"
     ["MLS #", listing.mls_number],
   ];
 
+  const potential = listing.investment?.potential ?? [];
+
   return (
     <div className="space-y-6">
       <Link href="/" className="inline-block text-sm text-muted hover:text-foreground">
@@ -65,6 +69,23 @@ export default async function ListingPage({ params }: PageProps<"/listings/[id]"
               ))}
           </dl>
 
+          {potential.length > 0 && (
+            <section className="space-y-3 rounded-xl border border-border bg-surface p-5">
+              <div className="space-y-2">
+                <h2 className="text-sm font-semibold">Ways to add value</h2>
+                <PotentialChips potential={potential} />
+              </div>
+              <ul className="space-y-1.5 text-sm">
+                {potential.map((p) => (
+                  <li key={p.key}>
+                    <span className="font-medium">{p.label}.</span>{" "}
+                    <span className="text-muted">{p.detail}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
           {listing.url && (
             <a
               href={listing.url}
@@ -90,6 +111,15 @@ export default async function ListingPage({ params }: PageProps<"/listings/[id]"
           <CitySection id={listing.id} />
         </Suspense>
       </div>
+
+      {listing.rooms.length > 0 && (
+        <div className="max-w-4xl">
+          {/* Needs the lot analysis, which may call the city's GIS, so it streams in. */}
+          <Suspense fallback={<div className="h-80 animate-pulse rounded-xl bg-border" />}>
+            <FloorPlanSection id={listing.id} />
+          </Suspense>
+        </div>
+      )}
 
       {listing.rooms.length > 0 && (
         <section className="max-w-4xl space-y-2">

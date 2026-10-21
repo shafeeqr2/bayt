@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import type { ListingSummary } from "@/lib/api";
 import { bedsLabel, formatPrice, formatSqft } from "@/lib/format";
+import { PotentialChips } from "./potential-chips";
 
 export function ListingCard({ listing, eager }: { listing: ListingSummary; eager: boolean }) {
   const facts = [
@@ -41,6 +42,11 @@ export function ListingCard({ listing, eager }: { listing: ListingSummary; eager
           {listing.address}
           {listing.community ? `, ${listing.community}` : ""}
         </p>
+        {listing.investment && listing.investment.potential.length > 0 && (
+          <div className="pt-1">
+            <PotentialChips potential={listing.investment.potential} max={3} />
+          </div>
+        )}
       </div>
     </Link>
   );

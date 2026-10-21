@@ -1,9 +1,9 @@
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
 
@@ -61,6 +61,10 @@ class Listing(Base):
         DateTime(timezone=True), server_default=func.now()
     )
 
+    investment_estimate: Mapped["ListingInvestment | None"] = relationship(
+        back_populates="listing", cascade="all, delete-orphan"
+    )
+
 
 class ListingCityData(Base):
     """A listing matched to City of Toronto open data (address, lot, zoning).
@@ -102,6 +106,52 @@ class ListingCityData(Base):
     policy_area: Mapped[str | None] = mapped_column(Text)
     rooming_house_area: Mapped[str | None] = mapped_column(Text)
     heritage_status: Mapped[str | None] = mapped_column(Text)
+
+
+class ListingInvestment(Base):
+    """What a listing would earn as a rental and what could be added to it.
+
+    Computed by `app.strategy.estimate` from the listing, its City of Toronto
+    match and its lot analysis, so the search can filter and sort on returns
+    in SQL. Rows are recomputed whenever `MODEL_VERSION` changes.
+    """
+
+    __tablename__ = "listing_investment"
+
+    listing_id: Mapped[str] = mapped_column(
+        String(32), ForeignKey("listings.id", ondelete="CASCADE"), primary_key=True
+    )
+    model_version: Mapped[int] = mapped_column(Integer)
+
+    # Monthly rent for the whole property: "listing" when the description
+    # states it, "market" when estimated from TRREB averages.
+    rent_monthly: Mapped[int] = mapped_column(Integer)
+    rent_source: Mapped[str] = mapped_column(Text)
+    rent_note: Mapped[str] = mapped_column(Text)
+    units: Mapped[int] = mapped_column(Integer)
+
+    gross_annual: Mapped[int] = mapped_column(Integer)
+    expenses_annual: Mapped[int] = mapped_column(Integer)
+    noi_annual: Mapped[int] = mapped_column(Integer, index=True)
+    gross_yield_pct: Mapped[float] = mapped_column(Float)
+    cap_rate_pct: Mapped[float] = mapped_column(Float, index=True)
+
+    # Ways to add value, each with a short reason shown to the buyer.
+    has_suite: Mapped[bool] = mapped_column(Boolean)
+    suite_potential: Mapped[bool] = mapped_column(Boolean)
+    suite_note: Mapped[str | None] = mapped_column(Text)
+    extra_bedroom_room: Mapped[str | None] = mapped_column(Text)
+    separate_entrance: Mapped[str | None] = mapped_column(Text)  # the evidence, or None
+    garden_suite: Mapped[str | None] = mapped_column(Text)  # lot analysis verdict
+    severance: Mapped[str | None] = mapped_column(Text)  # lot analysis verdict
+    as_of_right_units: Mapped[int | None] = mapped_column(Integer)
+    multiplex_zone: Mapped[bool] = mapped_column(Boolean)
+
+    computed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    listing: Mapped[Listing] = relationship(back_populates="investment_estimate")
 
 
 class LotAnalysisCache(Base):

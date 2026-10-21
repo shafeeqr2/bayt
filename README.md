@@ -174,6 +174,22 @@ Below it, a 3D view extrudes the house and every building within about 75 m to t
 - `garden_suite`: whether a garden suite fits in the rear yard after the by-law's separation, setbacks and footprint caps.
 - `caveats`: warnings such as a shared condo parcel or a site-specific zoning exception. Read these before trusting the verdicts.
 
+## Possible floor plan
+
+Listings rarely include a floor plan, but they list each room with its level and size.
+The backend fits those rooms into the city's building outline, level by level, and the listing page draws the result under "Possible layout".
+
+```bash
+curl http://localhost:8000/api/listings/30403436/floorplan
+```
+
+It is a plausible arrangement, never the real one.
+Rooms follow common layouts: the living room at the front, the kitchen and family room at the back, the kitchen beside the dining room, bedrooms on an exterior wall.
+Parts listings leave out are added and marked as assumed: one stair in the same place on every level, bathrooms from the bathroom count, and an attached garage when the parking type says so.
+A room up to 15% larger than the space available is drawn smaller and flagged; a room that still does not fit is listed under "Not drawn".
+It needs the lot analysis, so it covers Toronto houses only; condos and other cities get a one-line reason instead.
+The method is in the docstring of `backend/app/lot/floorplan.py`.
+
 ## Tests
 
 ```bash

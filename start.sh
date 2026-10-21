@@ -128,6 +128,7 @@ cmd_city_data() {
   info "Loading City of Toronto open data (first run downloads ~1 GB and takes a few minutes)"
   compose run --rm importer python3 /importer/import_city_data.py "$@"
   compose exec backend python -m app.city.match
+  compose exec backend python -m app.strategy.estimate --refresh
 }
 
 cmd_lot_analysis() {
@@ -136,6 +137,15 @@ cmd_lot_analysis() {
   start_services
   info "Computing lot analyses (map, coverage, infill potential) for Toronto listings via the city's GIS"
   compose exec backend python -m app.lot.backfill "$@"
+  compose exec backend python -m app.strategy.estimate --refresh
+}
+
+cmd_estimates() {
+  check_docker
+  load_env
+  start_services
+  info "Recomputing rent, return and value-add estimates for every listing"
+  compose exec backend python -m app.strategy.estimate --refresh
 }
 
 cmd_test() {
@@ -163,6 +173,8 @@ Usage: ./start.sh [command]
   lot-analysis [args] Compute lot analyses (lot map, coverage, severance and garden
                       suite potential) for every Toronto listing (re-run to retry
                       failures; --refresh recomputes, --help for more)
+  estimates           Recompute rent, return and value-add estimates for the
+                      strategy search (runs on its own at backend start)
   test [args]         Run backend tests
   logs [service]      Follow logs (default: backend)
   migration "msg"     Autogenerate an Alembic migration from model changes and apply it
@@ -184,6 +196,7 @@ case "$command" in
   migrate) cmd_migrate ;;
   city-data) cmd_city_data "$@" ;;
   lot-analysis) cmd_lot_analysis "$@" ;;
+  estimates) cmd_estimates ;;
   test) cmd_test "$@" ;;
   psql) cmd_psql ;;
   help | -h | --help) cmd_help ;;
