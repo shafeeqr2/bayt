@@ -2,11 +2,14 @@
 
 import { useState, type FormEvent } from "react";
 
+import { formatDate } from "@/lib/format";
 import {
+  APPLICATION_TYPE_LABELS,
   CATEGORY_LABELS,
   COST_LABELS,
   FACT_LABELS,
   TIME_LABELS,
+  type CardPrecedents,
   type Candidate,
   type Gap,
   type Intent,
@@ -14,6 +17,7 @@ import {
   type PathwayAnalysis,
   type Project,
 } from "@/lib/zoning";
+import { OutcomeLabel, SummaryChips } from "./precedents-ui";
 
 const PROJECTS: [Project, string][] = [
   ["unknown", "Not sure yet"],
@@ -262,9 +266,18 @@ function Results({ result }: { result: PathwayAnalysis }) {
       </div>
 
       <div className="space-y-3">
-        <h3 className="font-semibold">
-          {result.mode === "buyer" ? "Routes and the questions to ask" : "Pathways to explore"}
-        </h3>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h3 className="font-semibold">
+            {result.mode === "buyer" ? "Routes and the questions to ask" : "Pathways to explore"}
+          </h3>
+          {result.precedents && result.precedent_radius_m && (
+            <p className="text-sm text-muted">
+              {result.precedents.total} Committee of Adjustment files within {result.precedent_radius_m} m since 2001
+              {result.precedents.approval_rate != null && `, ${Math.round(result.precedents.approval_rate * 100)}% of decided files approved`}
+              .
+            </p>
+          )}
+        </div>
         {result.candidates.length === 0 ? (
           <p className="text-sm text-muted">No pathway in the playbook matches what you gave. Fill in more of the plan.</p>
         ) : (
@@ -382,6 +395,7 @@ function CandidateCard({ c, mode }: { c: Candidate; mode: Mode }) {
         <List title="Risks" items={c.risks} tone="risk" />
         <List title={mode === "buyer" ? "Ask your lawyer, agent or builder" : "Check next"} items={c.questions} />
       </div>
+      {c.precedents && <Comparable p={c.precedents} />}
       <details className="mt-3 text-sm">
         <summary className="cursor-pointer text-muted hover:text-foreground">Steps and legal basis</summary>
         <div className="mt-2 grid gap-4 md:grid-cols-2">
@@ -409,6 +423,43 @@ function CandidateCard({ c, mode }: { c: Candidate; mode: Mode }) {
         </div>
       </details>
     </li>
+  );
+}
+
+/** What the committee did with comparable files near this lot: counts, then the most recent decided ones. */
+function Comparable({ p }: { p: CardPrecedents }) {
+  const what = [...p.work_types, ...p.keywords.map((k) => `"${k}"`)].join(", ");
+  if (p.summary.total === 0) {
+    return <p className="mt-3 text-xs text-muted">No comparable file nearby ({what}).</p>;
+  }
+  return (
+    <div className="mt-3 space-y-2 rounded-lg bg-background p-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <p className="text-xs font-medium text-muted">
+          Nearby decisions on comparable files <span className="font-normal">({what})</span>
+        </p>
+        <SummaryChips summary={p.summary} compact />
+      </div>
+      {p.examples.length > 0 && (
+        <ul className="space-y-1.5 text-xs leading-snug">
+          {p.examples.map((e) => (
+            <li key={e.sys_id} className="grid gap-x-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+              <span>
+                <span className="font-medium">{e.address ?? "Address withheld"}</span>
+                <span className="text-muted">
+                  {" "}
+                  · {Math.round(e.distance_m)} m
+                  {e.hearing_date && ` · ${formatDate(e.hearing_date)}`}
+                  {e.application_type && ` · ${APPLICATION_TYPE_LABELS[e.application_type] ?? e.application_type}`}
+                </span>
+                {e.description && <span className="block text-muted line-clamp-2">{e.description}</span>}
+              </span>
+              <OutcomeLabel p={e} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 

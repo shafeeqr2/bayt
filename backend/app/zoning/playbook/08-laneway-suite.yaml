@@ -54,4 +54,5 @@ professional_notes:
   - Check for angular plane and window rules in 150.8.60 that depend on the lot width.
 cost_band: low
 time_band: weeks
-precedent_work_types: [Laneway Suite, R Addition]
+precedent_work_types: []
+precedent_keywords: [laneway suite, laneway house]

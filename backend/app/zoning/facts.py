@@ -13,6 +13,7 @@ from typing import Any
 from app.lot.schemas import LotAnalysis
 from app.zoning.gaps import GapRow
 from app.zoning.intent import Intent
+from app.zoning.precedents import PrecedentSummary
 from app.zoning.standards import STANDARDS
 
 GAP_FIELDS = {
@@ -64,13 +65,24 @@ FACT_PATHS: dict[str, str] = {
     "gaps.count_short": "How many standards the proposal is short on",
     "gaps.count_unknown": "How many standards could not be judged",
     "existing.count_short": "How many standards the existing building is short on",
+    "precedents.total": "Committee of Adjustment files within the search radius (None when the data is not loaded)",
+    "precedents.approved": "Of those, files approved (by the committee or on appeal)",
+    "precedents.refused": "Of those, files refused",
+    "precedents.approval_rate": "approved / (approved + refused); None with no decided file",
 }
 for _std in STANDARDS:
     for _f, _desc in GAP_FIELDS.items():
         FACT_PATHS[f"gap.{_std}.{_f}"] = f"{_std}: {_desc}"
 
 
-def build_facts(lot: LotAnalysis, intent: Intent, gaps: list[GapRow], *, heritage_listed: bool | None = None) -> dict[str, Any]:
+def build_facts(
+    lot: LotAnalysis,
+    intent: Intent,
+    gaps: list[GapRow],
+    *,
+    heritage_listed: bool | None = None,
+    precedents: PrecedentSummary | None = None,
+) -> dict[str, Any]:
     e = lot.envelope
     f: dict[str, Any] = {
         "parcel.frontage_m": lot.parcel.frontage_m,
@@ -112,6 +124,10 @@ def build_facts(lot: LotAnalysis, intent: Intent, gaps: list[GapRow], *, heritag
         "gaps.count_short": sum(1 for g in gaps if g.status == "short"),
         "gaps.count_unknown": sum(1 for g in gaps if g.status == "unknown"),
         "existing.count_short": sum(1 for g in gaps if g.existing_status == "short"),
+        "precedents.total": precedents.total if precedents else None,
+        "precedents.approved": precedents.approved if precedents else None,
+        "precedents.refused": precedents.refused if precedents else None,
+        "precedents.approval_rate": precedents.approval_rate if precedents else None,
     }
     for g in gaps:
         f[f"gap.{g.standard}.status"] = g.status

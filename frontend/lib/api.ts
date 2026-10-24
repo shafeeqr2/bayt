@@ -1,6 +1,7 @@
 import "server-only";
 
 import { BACKEND_URL } from "./backend";
+import type { PrecedentSearch } from "./zoning";
 
 export type PotentialKey =
   | "suite"
@@ -347,3 +348,15 @@ export type MapPin = {
   community: string | null;
   cover_photo: string | null;
 };
+
+/**
+ * Committee of Adjustment applications near a listing (Toronto Open Data), nearest first.
+ * null when the listing has no coordinates or the data has not been loaded (`./start.sh city-data`).
+ */
+export async function getPrecedents(id: string, radiusM = 500): Promise<PrecedentSearch | null> {
+  const path = `/api/listings/${encodeURIComponent(id)}/zoning/precedents?radius_m=${radiusM}`;
+  const res = await fetch(`${BACKEND_URL}${path}`);
+  if (res.status === 404 || res.status === 422) return null;
+  if (!res.ok) throw new Error(`API ${path} failed: ${res.status}`);
+  return res.json();
+}

@@ -4,6 +4,7 @@ import { getCityData, getLotAnalysis, type CityData, type Permit } from "@/lib/a
 import { formatArea, formatDate, formatMetres, formatPrice } from "@/lib/format";
 import { CoverageFacts, LotMapCell, LotSceneSection, ParcelOnly } from "./lot-panel";
 import { PathwaysPanel } from "./pathways-panel";
+import { PrecedentsSection } from "./precedents-section";
 
 // Zones where Toronto has allowed up to four units as-of-right since May 2023.
 const MULTIPLEX_ZONES = new Set(["R", "RD", "RS", "RT", "RM"]);
@@ -52,6 +53,10 @@ export async function CitySection({ id }: { id: string }) {
       {/* The pathway analysis resolves the low-rise residential chapter only. */}
       {city.zone_category && MULTIPLEX_ZONES.has(city.zone_category) && <PathwaysPanel id={id} />}
 
+      <Suspense fallback={null}>
+        <PrecedentsSection id={id} />
+      </Suspense>
+
       <Permits permits={city.permits} />
     </section>
   );
@@ -86,6 +91,10 @@ async function LotOnlySection({ id }: { id: string }) {
       <LotSceneSection id={id} city={null} />
 
       <PathwaysPanel id={id} />
+
+      <Suspense fallback={null}>
+        <PrecedentsSection id={id} />
+      </Suspense>
     </section>
   );
 }

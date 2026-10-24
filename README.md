@@ -44,7 +44,7 @@ The frontend talks to the API from the server side only, using `BACKEND_URL` (se
 ./start.sh backend             # start only Postgres + API
 ./start.sh down                # stop Postgres + API (data is kept)
 ./start.sh reset               # wipe your local database and reseed
-./start.sh city-data           # load or refresh City of Toronto data
+./start.sh city-data           # load or refresh City of Toronto data (zoning, lots, permits, Committee of Adjustment)
 ./start.sh test                # run backend tests
 ./start.sh logs                # follow backend logs
 ./start.sh psql                # open a Postgres shell
@@ -199,7 +199,10 @@ curl -X POST http://localhost:8000/api/listings/30403339/zoning/pathways \
   -H 'content-type: application/json' \
   -d '{"mode": "buyer", "keep_existing_walls": true, "proposed_rear_setback_m": 8.0, "proposed_storeys": 2}'
 curl http://localhost:8000/api/zoning/playbook   # every playbook card with its trigger and legal basis
+curl "http://localhost:8000/api/listings/30403339/zoning/precedents?radius_m=500"   # nearby Committee of Adjustment files
 ```
+
+Once `./start.sh city-data` has loaded the Committee of Adjustment open data (every minor variance and consent application since 2001, placed on the city's address points), the answer also shows what the committee decided on comparable files near the lot, and the listing page lists the nearest decisions. The open data has the decision and the description, not the variance table.
 
 Design and module notes: [`docs/zoning-pathways.md`](docs/zoning-pathways.md).
 

@@ -50,9 +50,14 @@ _TRAILING_UNIT = re.compile(r"\s+(?:UNIT|SUITE|APT)\s*#?\s*(\S+)\s*$", re.IGNORE
 def normalize_name(name: str) -> str:
     """Uppercase and drop punctuation so "St. Clair" matches "St Clair".
 
-    Must stay in sync with the SQL expression in `app.city.match.NAME_SQL`.
+    Must stay in sync with the SQL expression in `NAME_SQL`.
     """
     return re.sub(r"\s+", " ", re.sub(r"[.']", "", name.upper())).strip()
+
+
+# SQL twin of normalize_name, for matching against city.address_points.
+NAME_SQL = "trim(regexp_replace(regexp_replace(upper({col}), '[.'']', '', 'g'), '\\s+', ' ', 'g'))"
+AP_NAME = NAME_SQL.format(col="linear_name")
 
 
 @dataclass(frozen=True)

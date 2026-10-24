@@ -56,4 +56,5 @@ professional_notes:
   - Check for ravine, flood or heritage overlays that remove the permission.
 cost_band: low
 time_band: weeks
-precedent_work_types: [Garden Suite, R Addition]
+precedent_work_types: []
+precedent_keywords: [garden suite]

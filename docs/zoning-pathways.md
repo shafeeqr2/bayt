@@ -98,17 +98,88 @@ The end-to-end tests build a synthetic RD block and check the 2-walls case: a
 house 0.6 m from the side line with a 1.2 m requirement, walls kept, rear wall
 pushed out. The alteration card ranks first and covers the side and rear gaps.
 
-## Precedent corpus (phase 1b, not built yet)
+## Precedent corpus (phase 1b)
 
 Toronto Open Data publishes "Committee of Adjustment Applications" daily
-(package `committee-of-adjustment-applications`): active files, closed files
-since 2017, and 1 file per year back to 2001. Each record has the address, the
-zone label, `WORK_TYPE`, `SUB_TYPE`, `DESCRIPTION`, `HEARING_DATE`,
+(package `committee-of-adjustment-applications`): an active file, a closed file
+since 2017, and 1 closed file per year back to 2001. Each record has the street
+address, the zone label, `WORK_TYPE`, `SUB_TYPE`, `DESCRIPTION`, `HEARING_DATE`,
 `C_OF_A_DESCISION`, `OMB_DESCISION` and `STATUSDESC`. It has no variance table
-and no coordinates. The variance tables (required vs proposed per standard) are
-in the hearing agenda PDFs on each district's schedule page, which go back about
-1 year. Decision notices after the appeal period need the paid Research Request
-Portal. "Local Appeals Body Appeals" is a separate monthly dataset.
+and no coordinates.
 
-Plan: load the open data, geocode by address against `city.address_points`, join
-to parcels, and extract variance tables from the agenda PDFs for the last year.
+What is not available in bulk: the variance table (required vs proposed per
+standard). The hearing agenda PDFs on the 4 district schedule pages are item
+lists only (file number, address, ward), in every district and in both the 2025
+and 2026 layouts. The per-file public hearing notice has the table, but the
+Application Information Centre keeps it for about 90 days and older notices
+need the paid Research Request Portal. So a precedent here is "what the file
+asked for, in the city's words, and what was decided", not a variance-by-
+variance comparison.
+
+### Load
+
+`./start.sh city-data` runs 2 steps:
+
+1. The importer (`importer/import_city_data.py`, `coa_csv`) downloads the 18
+   datastore dumps, renames the columns to one lower-snake-case header
+   (`REFERENCE_FILE#` and `REFERENCE_FILE` become `reference_file`; the yearly
+   files' `WARD` and the newer `WARD_NAME` + `WARD_NUMBER` both survive), adds a
+   `source` column (`active` or `closed`), and loads the merged CSV as
+   `city.coa_raw` with every column as text. The dumps carry no
+   `last_modified`, so the package's `last_refreshed` versions the cache.
+2. `python -m app.city.coa` builds `city.coa_applications`: 1 row per `SYS_ID`
+   (a decided row beats an undecided one), dates parsed (3 formats; typo years
+   such as 0227 and 3008 become null), the decision and the appeal normalized,
+   and a point from `city.address_points`. The backend entrypoint runs it with
+   `--if-needed` on start.
+
+Normalized vocabulary (`app/city/coa.py`):
+
+| Column | Values |
+|---|---|
+| `decision` | approved, approved_with_conditions, approved_in_part, refused, withdrawn, deferred, pending, unknown. From 40+ raw spellings ("Approved wih Conditions", "conditional approval", "Not Granted"); the status column fills in a blank decision. |
+| `appeal` | approved or refused (the board decided the file), dismissed (the committee's decision stands), pending, unknown, or null. `appeal_body` is OMB or TLAB when the text or status says. |
+| `outcome` | approved, refused, withdrawn, deferred, pending, unknown. The board's result wins over the committee's. |
+
+Geocoding joins on the normalized street name (same rule as the listing
+matcher, `app.city.address.normalize_name`), the exact street number first and a
+`lo_num`..`hi_num` range second, with the street type and direction required to
+agree when both sides have one. There is no pin to break ties, so a candidate on
+a different street is never taken. On 2026-10-24: 94,527 applications, 88,816
+placed (94%). The unplaced rows are mostly placeholder addresses such as "99
+IBMS CONVERT SCARBOROUGH" and "0 MIDLAND AVE".
+
+### Query
+
+`app/zoning/precedents.py`. `nearby()` is the only database call: every file
+within a radius (default 500 m, max 2,000 m, up to 1,500 rows), nearest first,
+with optional `work_type` and description filters. `summarize()` counts
+outcomes and the approval rate (approved / decided). `for_card()` picks the
+files a strategy card calls comparable: `precedent_work_types` (exact
+`WORK_TYPE` values: R Addition, New R Building, Sever Lot, ...) or
+`precedent_keywords` in the description (garden suite, laneway suite,
+fourplex, ...). Garden and laneway suites are not a `WORK_TYPE`, so those cards
+use keywords only.
+
+The pathway analysis takes the nearby files as data (`analyze_pathways(...,
+precedents=...)`), so it stays pure. It adds 4 facts (`precedents.total`,
+`.approved`, `.refused`, `.approval_rate`) that a card trigger may read, a
+summary on the answer, and on each candidate the comparable files with up to 5
+decided examples (keyword matches first, then most recent).
+
+```
+GET /api/listings/{id}/zoning/precedents?radius_m=500&work_type=&q=  -> PrecedentSearch
+GET /api/zoning/precedents?lat=&lon=&radius_m=                       -> PrecedentSearch
+```
+
+404 when the table is not loaded. The listing page shows "Committee of
+Adjustment decisions nearby" under the lot section and the comparable files on
+each pathway card.
+
+### Caveats
+
+An approved file nearby is not an approval of this plan: the variance asked for
+is unknown, the zone label may differ, and the by-law changed in 2013 and again
+with the multiplex permissions in 2023. The answer says so in its caveats. A
+later phase can enrich recent files with the hearing notice from the
+Application Information Centre while it is still online.

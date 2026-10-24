@@ -128,6 +128,7 @@ cmd_city_data() {
   info "Loading City of Toronto open data (first run downloads ~1 GB and takes a few minutes)"
   compose run --rm importer python3 /importer/import_city_data.py "$@"
   compose exec backend python -m app.city.match
+  compose exec backend python -m app.city.coa
   compose exec backend python -m app.strategy.estimate --refresh
 }
 
@@ -168,8 +169,9 @@ Usage: ./start.sh [command]
   backend             Start only Postgres + API (no frontend)
   down                Stop Postgres + API (data is kept)
   reset               Delete the local database and reseed it from backend/seed/
-  city-data [tables]  Download City of Toronto zoning, lots, addresses, permits and
-                      heritage data, then match listings to it (re-run to refresh)
+  city-data [tables]  Download City of Toronto zoning, lots, addresses, permits,
+                      heritage and Committee of Adjustment data, then match listings
+                      to it (re-run to refresh)
   lot-analysis [args] Compute lot analyses (lot map, coverage, severance and garden
                       suite potential) for every Toronto listing (re-run to retry
                       failures; --refresh recomputes, --help for more)

@@ -13,6 +13,7 @@ from app.zoning import cards as playbook
 from app.zoning.facts import build_facts
 from app.zoning.gaps import analyze_gaps
 from app.zoning.intent import Intent
+from app.zoning.precedents import Precedent, for_card, summarize
 from app.zoning.predicate import Truth
 from app.zoning.schemas import CandidateOut, GapOut, LegalBasisOut, PathwayAnalysis
 
@@ -25,9 +26,13 @@ def analyze_pathways(
     height_limit_storeys: int | None = None,
     overlay_checked: bool = False,
     heritage_listed: bool | None = None,
+    precedents: list[Precedent] | None = None,
+    precedent_radius_m: int | None = None,
 ) -> PathwayAnalysis:
+    """`precedents` is every Committee of Adjustment file within `precedent_radius_m`; None when the data is not loaded."""
     gaps = analyze_gaps(lot, intent, height_limit_m=height_limit_m, height_limit_storeys=height_limit_storeys, overlay_checked=overlay_checked)
-    facts = build_facts(lot, intent, gaps, heritage_listed=heritage_listed)
+    summary = summarize(precedents) if precedents is not None else None
+    facts = build_facts(lot, intent, gaps, heritage_listed=heritage_listed, precedents=summary)
     candidates = playbook.match(facts)
 
     caveats = list(lot.caveats)
@@ -41,6 +46,13 @@ def analyze_pathways(
         caveats.append("The existing building's position is not in this cached lot analysis; refresh it to judge the alteration pathways.")
     elif lot.envelope is None:
         caveats.append("No main building found, so existing setbacks are unknown and the alteration pathways cannot be judged.")
+    if precedents is None:
+        caveats.append("Committee of Adjustment data is not loaded, so no nearby decisions are shown (./start.sh city-data).")
+    elif precedents:
+        caveats.append(
+            "Nearby decisions come from the city's open data, which has the decision and the description but not the "
+            "variance table. An approved file nearby is not an approval of this plan."
+        )
 
     missing: set[str] = set()
     outs: list[CandidateOut] = []
@@ -65,6 +77,7 @@ def analyze_pathways(
                 cost_band=card.cost_band,
                 time_band=card.time_band,
                 score=c.score,
+                precedents=for_card(precedents, card) if precedents is not None else None,
             )
         )
 
@@ -78,6 +91,8 @@ def analyze_pathways(
         unknown_standards=[g.standard for g in gaps if g.status == "unknown"],
         candidates=outs,
         missing_facts=sorted(missing),
+        precedents=summary,
+        precedent_radius_m=precedent_radius_m if precedents is not None else None,
         caveats=caveats,
         playbook_version=playbook.playbook_version(),
         computed_at=datetime.now(timezone.utc),

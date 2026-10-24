@@ -43,6 +43,81 @@ export type Gap = {
   note: string | null;
 };
 
+export type Outcome = "approved" | "refused" | "withdrawn" | "deferred" | "pending" | "unknown";
+
+/** One Committee of Adjustment application near the lot, from Toronto Open Data. */
+export type Precedent = {
+  sys_id: string;
+  reference_file: string | null;
+  application_type: "MV" | "CO" | null;
+  work_type: string | null;
+  sub_type: string | null;
+  description: string | null;
+  zoning_designation: string | null;
+  address: string | null;
+  planning_district: string | null;
+  in_date: string | null;
+  hearing_date: string | null;
+  decision: string;
+  decision_raw: string | null;
+  appeal: string | null;
+  appeal_body: string | null;
+  outcome: Outcome;
+  status: string | null;
+  distance_m: number;
+  lat: number;
+  lon: number;
+};
+
+export type PrecedentSummary = {
+  total: number;
+  approved: number;
+  refused: number;
+  withdrawn: number;
+  deferred: number;
+  pending: number;
+  unknown: number;
+  approval_rate: number | null;
+  appealed: number;
+  by_work_type: Record<string, number>;
+  oldest_hearing: string | null;
+  newest_hearing: string | null;
+};
+
+export type CardPrecedents = {
+  work_types: string[];
+  keywords: string[];
+  summary: PrecedentSummary;
+  examples: Precedent[];
+};
+
+export type PrecedentSearch = {
+  lat: number;
+  lon: number;
+  radius_m: number;
+  work_type: string | null;
+  query: string | null;
+  summary: PrecedentSummary;
+  items: Precedent[];
+  truncated: boolean;
+  source_url: string;
+  note: string;
+};
+
+export const OUTCOME_LABELS: Record<Outcome, string> = {
+  approved: "Approved",
+  refused: "Refused",
+  withdrawn: "Withdrawn",
+  deferred: "Deferred",
+  pending: "Pending",
+  unknown: "No decision on file",
+};
+
+export const APPLICATION_TYPE_LABELS: Record<string, string> = {
+  MV: "Minor variance",
+  CO: "Consent",
+};
+
 export type Candidate = {
   card_id: string;
   name: string;
@@ -60,6 +135,7 @@ export type Candidate = {
   cost_band: string;
   time_band: string;
   score: number;
+  precedents: CardPrecedents | null;
 };
 
 export type PathwayAnalysis = {
@@ -72,6 +148,8 @@ export type PathwayAnalysis = {
   unknown_standards: string[];
   candidates: Candidate[];
   missing_facts: string[];
+  precedents: PrecedentSummary | null;
+  precedent_radius_m: number | null;
   caveats: string[];
   playbook_version: string;
   disclaimer: string;

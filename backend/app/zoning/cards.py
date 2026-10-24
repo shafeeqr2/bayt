@@ -55,7 +55,8 @@ class StrategyCard(BaseModel):
     professional_notes: list[str] = Field(default_factory=list, description="Professional mode: what to check next")
     cost_band: CostBand
     time_band: TimeBand
-    precedent_work_types: list[str] = Field(default_factory=list, description="Committee of Adjustment WORK_TYPE values to pull as precedents")
+    precedent_work_types: list[str] = Field(default_factory=list, description="Committee of Adjustment WORK_TYPE values that count as comparable files")
+    precedent_keywords: list[str] = Field(default_factory=list, description="Words in a file's DESCRIPTION that make it comparable (e.g. 'garden suite')")
     version: int = 1
 
     @field_validator("covers")

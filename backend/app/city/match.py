@@ -16,16 +16,12 @@ import argparse
 
 from sqlalchemy import Connection, text
 
-from app.city.address import parse
+from app.city.address import AP_NAME, parse
 from app.db import engine
 
 ADDRESS_MAX_M = 2000  # Same number and street name, but this far from the pin: wrong street.
 NEAREST_MAX_M = 40
 TYPE_MISMATCH_MAX_M = 300
-
-# SQL twin of app.city.address.normalize_name.
-NAME_SQL = "trim(regexp_replace(regexp_replace(upper({col}), '[.'']', '', 'g'), '\\s+', ' ', 'g'))"
-AP_NAME = NAME_SQL.format(col="linear_name")
 
 INDEXES = [
     f"CREATE INDEX IF NOT EXISTS address_points_number_name ON city.address_points (upper(address_number), ({AP_NAME}))",

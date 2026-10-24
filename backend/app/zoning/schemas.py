@@ -8,6 +8,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from app.zoning.intent import Intent
+from app.zoning.precedents import CardPrecedents, PrecedentSummary
 
 DISCLAIMER = (
     "This is a research summary of public zoning rules and past decisions for 1 parcel. "
@@ -58,6 +59,9 @@ class CandidateOut(BaseModel):
     cost_band: str
     time_band: str
     score: int
+    precedents: CardPrecedents | None = Field(
+        None, description="Comparable Committee of Adjustment files near the lot; null when the card names none or the data is not loaded"
+    )
 
 
 class PathwayAnalysis(BaseModel):
@@ -70,6 +74,8 @@ class PathwayAnalysis(BaseModel):
     unknown_standards: list[str]
     candidates: list[CandidateOut]
     missing_facts: list[str] = Field(description="Facts that would turn a may_apply into applies or drops it")
+    precedents: PrecedentSummary | None = Field(None, description="All Committee of Adjustment files within precedent_radius_m; null when not loaded")
+    precedent_radius_m: int | None = None
     caveats: list[str]
     playbook_version: str
     disclaimer: str = DISCLAIMER

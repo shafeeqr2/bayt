@@ -33,6 +33,7 @@ from app.strategy import parse as strategy_parse
 from app.strategy import search as strategy
 from app.strategy.finance import Financing
 from app.zoning import cards as zoning_cards
+from app.zoning import precedents as zoning_precedents
 from app.zoning import service as zoning_service
 from app.zoning.intent import Intent
 from app.zoning.schemas import PathwayAnalysis
@@ -355,14 +356,59 @@ def post_listing_pathways(listing_id: str, intent: Intent, session: SessionDep) 
 @app.post("/api/zoning/pathways")
 def post_point_pathways(
     intent: Intent,
+    session: SessionDep,
     lat: Annotated[float, Query(ge=-90, le=90)],
     lon: Annotated[float, Query(ge=-180, le=180)],
 ) -> PathwayAnalysis:
     """Zoning gaps and pathways for a proposal at any point in Toronto (not cached)."""
     try:
-        return zoning_service.pathways_for_point(lat, lon, intent)
+        return zoning_service.pathways_for_point(session, lat, lon, intent)
     except (lot_service.NotInCoverage, lot_service.GISError) as exc:
         raise _lot_errors(exc) from exc
+
+
+RadiusDep = Annotated[int, Query(ge=50, le=zoning_precedents.MAX_RADIUS_M, description="Search radius in metres")]
+
+
+def _precedents_loaded(session: Session) -> None:
+    if not zoning_precedents.loaded(session):
+        raise HTTPException(status_code=404, detail="Committee of Adjustment data not loaded (./start.sh city-data)")
+
+
+@app.get("/api/listings/{listing_id}/zoning/precedents")
+def get_listing_precedents(
+    listing_id: str,
+    session: SessionDep,
+    radius_m: RadiusDep = zoning_precedents.DEFAULT_RADIUS_M,
+    work_type: str | None = None,
+    q: Annotated[str | None, Query(max_length=80, description="Words that must appear in the description")] = None,
+) -> zoning_precedents.PrecedentSearch:
+    """Committee of Adjustment applications near this listing, nearest first, with outcome counts.
+
+    404 when the listing is unknown or the Committee of Adjustment data is not loaded.
+    """
+    listing = session.get(Listing, listing_id)
+    if listing is None:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    _precedents_loaded(session)
+    try:
+        return zoning_service.precedents_for_listing(session, listing, radius_m, work_type=work_type, query=q)
+    except lot_service.ListingNotLocated as exc:
+        raise _lot_errors(exc) from exc
+
+
+@app.get("/api/zoning/precedents")
+def get_point_precedents(
+    session: SessionDep,
+    lat: Annotated[float, Query(ge=-90, le=90)],
+    lon: Annotated[float, Query(ge=-180, le=180)],
+    radius_m: RadiusDep = zoning_precedents.DEFAULT_RADIUS_M,
+    work_type: str | None = None,
+    q: Annotated[str | None, Query(max_length=80)] = None,
+) -> zoning_precedents.PrecedentSearch:
+    """Committee of Adjustment applications around any point in Toronto."""
+    _precedents_loaded(session)
+    return zoning_service.precedents_for_point(session, lat, lon, radius_m, work_type=work_type, query=q)
 
 
 @app.get("/api/zoning/playbook")
