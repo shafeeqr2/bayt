@@ -190,6 +190,19 @@ A room up to 15% larger than the space available is drawn smaller and flagged; a
 It needs the lot analysis, so it covers Toronto houses only; condos and other cities get a one-line reason instead.
 The method is in the docstring of `backend/app/lot/floorplan.py`.
 
+## Zoning pathways
+
+For a Toronto house, the API compares a proposal (an addition, a rebuild, more units, a garden or laneway suite, a severance) with Zoning By-law 569-2013 and lists the public routes that address each shortfall, with their risks. Phase 1 is deterministic: rule resolution, gap analysis and a hand-written playbook matched by predicate. No language model is involved. The listing page has the form under "What could you build here?".
+
+```bash
+curl -X POST http://localhost:8000/api/listings/30403339/zoning/pathways \
+  -H 'content-type: application/json' \
+  -d '{"mode": "buyer", "keep_existing_walls": true, "proposed_rear_setback_m": 8.0, "proposed_storeys": 2}'
+curl http://localhost:8000/api/zoning/playbook   # every playbook card with its trigger and legal basis
+```
+
+Design and module notes: [`docs/zoning-pathways.md`](docs/zoning-pathways.md).
+
 ## Tests
 
 ```bash

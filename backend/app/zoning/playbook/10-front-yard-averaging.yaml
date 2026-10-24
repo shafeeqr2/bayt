@@ -1,0 +1,36 @@
+id: front-yard-setback-averaging
+name: Front yard setback may follow the average of the neighbours
+category: as_of_right
+summary: >
+  Where residential buildings on the same street are within 15.0 m of the lot, the required
+  front yard setback is based on the neighbours' setbacks instead of the flat 6.0 m. A plan
+  that lines up with the neighbours may need no variance for the front yard.
+decision_body: Toronto Building (zoning examiner at permit review)
+covers: [front_setback]
+trigger:
+  all:
+    - gap.front_setback.status == short
+    - parcel.corner_lot == false
+legal_basis:
+  - clause: 10.5.40.70(1)
+    says: Front yard setback averaging applies where neighbouring residential buildings on the same street are within 15.0 m of the lot.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter10_5.htm
+  - clause: 10.20.40.70(1)
+    says: The RD zone front yard setback is 6.0 m unless 10.5.40.70(1) applies.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter10_20.htm
+mechanics:
+  - Have the surveyor measure the front main wall setback of the buildings on both sides.
+  - Ask the zoning examiner to apply the averaging rule in the zoning review.
+  - Design the front wall to the averaged setback.
+risks:
+  - The rule needs qualifying neighbours. A corner lot, a park or a vacant lot next door changes the result.
+  - Porches and bay windows have their own encroachment limits in 10.5.40.60.
+  - A survey of the neighbours' walls costs money and needs access or good records.
+buyer_questions:
+  - Where are the neighbours' front walls relative to the lot line?
+  - Does the plan line up with them?
+professional_notes:
+  - Read 10.5.40.70(1) in full for the exact averaging formula; the zoning examiner applies it.
+cost_band: none
+time_band: weeks
+precedent_work_types: [R Addition, New R Building]

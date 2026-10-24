@@ -32,12 +32,16 @@ from app.strategy import estimate as strategy_estimate
 from app.strategy import parse as strategy_parse
 from app.strategy import search as strategy
 from app.strategy.finance import Financing
+from app.zoning import cards as zoning_cards
+from app.zoning import service as zoning_service
+from app.zoning.intent import Intent
+from app.zoning.schemas import PathwayAnalysis
 
 app = FastAPI(title="Bayt API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
@@ -331,3 +335,37 @@ def get_lot(
         return lot_service.analyze_point(lat, lon)
     except (lot_service.NotInCoverage, lot_service.GISError) as exc:
         raise _lot_errors(exc) from exc
+
+
+@app.post("/api/listings/{listing_id}/zoning/pathways")
+def post_listing_pathways(listing_id: str, intent: Intent, session: SessionDep) -> PathwayAnalysis:
+    """Zoning gaps for a proposal on this listing's lot, and the playbook pathways that address them.
+
+    Deterministic: rule resolution, gap analysis and predicate matching. No model call.
+    """
+    listing = session.get(Listing, listing_id)
+    if listing is None:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    try:
+        return zoning_service.pathways_for_listing(session, listing, intent)
+    except (lot_service.NotInCoverage, lot_service.ListingNotLocated, lot_service.GISError) as exc:
+        raise _lot_errors(exc) from exc
+
+
+@app.post("/api/zoning/pathways")
+def post_point_pathways(
+    intent: Intent,
+    lat: Annotated[float, Query(ge=-90, le=90)],
+    lon: Annotated[float, Query(ge=-180, le=180)],
+) -> PathwayAnalysis:
+    """Zoning gaps and pathways for a proposal at any point in Toronto (not cached)."""
+    try:
+        return zoning_service.pathways_for_point(lat, lon, intent)
+    except (lot_service.NotInCoverage, lot_service.GISError) as exc:
+        raise _lot_errors(exc) from exc
+
+
+@app.get("/api/zoning/playbook")
+def get_playbook() -> list[zoning_cards.StrategyCard]:
+    """Every playbook card, so the frontend and reviewers can read the pathways and their triggers."""
+    return zoning_cards.playbook()

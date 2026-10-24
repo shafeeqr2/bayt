@@ -1,0 +1,57 @@
+id: laneway-suite-as-of-right
+name: Laneway suite on a lot that abuts a public lane, permitted without a variance
+category: as_of_right
+summary: >
+  Chapter 150.8 permits a separate dwelling unit in an ancillary building at the rear of a
+  lot that abuts a lane. The suite needs at least 3.5 m of lot line on the lane, a separation
+  from the house, size limits and a fire access path.
+decision_body: Toronto Building (permit review, no Committee hearing)
+covers: [units]
+trigger:
+  all:
+    - zoning.low_rise == true
+    - parcel.abuts_laneway == true
+    - any:
+        - intent.project == laneway_suite
+        - gap.units.status == short
+        - intent.proposed_units >= 2
+legal_basis:
+  - clause: 150.8.30.20(1)
+    says: The lot needs a rear or side lot line that abuts a lane, with at least 3.5 m of lot line along the lane.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter150_8.htm
+  - clause: 150.8.60.40(1)
+    says: Height is 4.0 m if the suite is within 7.5 m of the house, and 6.3 m if it is 7.5 m or more away.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter150_8.htm
+  - clause: 150.8.60.30(1)
+    says: Separation from the house is 4.0 m for a suite up to 4.0 m tall and 7.5 m for a taller suite.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter150_8.htm
+  - clause: 150.8.60.30(5)
+    says: Building length is 10.0 m at most.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter150_8.htm
+  - clause: 150.8.60.30(6)
+    says: Building width is 8.0 m at most.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter150_8.htm
+  - clause: 150.8.60.20(2)
+    says: Setback from the lane is 0.0 m with no openings in the rear wall, otherwise 1.0 m.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter150_8.htm
+mechanics:
+  - Confirm that the lot has at least 3.5 m of lot line on a public lane.
+  - Design within the 10.0 m by 8.0 m box and the height band for the separation from the house.
+  - Keep a 1.0 m clear path from the street to the suite entrance for fire access.
+  - Apply for a building permit. No Committee of Adjustment hearing is needed when every standard is met.
+risks:
+  - The lane must be a public lane. A private right of way does not qualify.
+  - Fire access from the street is the most common miss. The path must be clear for its full length.
+  - Trees, utility poles and hydro lines along the lane affect the design.
+  - A suite that misses one standard needs a minor variance after all.
+  - Servicing from the house is required. The cost depends on the distance and the lot.
+buyer_questions:
+  - Is the lane a public lane, and how much of the lot touches it?
+  - Is there a 1.0 m clear path from the street to the rear?
+  - What would a laneway suite cost to build and to service here?
+professional_notes:
+  - Confirm the lane status with the city's centreline data and the survey.
+  - Check for angular plane and window rules in 150.8.60 that depend on the lot width.
+cost_band: low
+time_band: weeks
+precedent_work_types: [Laneway Suite, R Addition]

@@ -1,0 +1,52 @@
+id: severance-consent
+name: Sever the lot into 2 lots by consent
+category: consent
+summary: >
+  A consent under section 53 of the Planning Act divides a lot. The Committee of Adjustment
+  tests the new lots against the Official Plan Neighbourhoods policies and the zoning
+  minimums for frontage and area. A new lot that is short on frontage or area also needs
+  a minor variance, usually heard at the same hearing.
+decision_body: Committee of Adjustment
+covers: [lot_frontage, lot_area]
+trigger:
+  all:
+    - zoning.low_rise == true
+    - intent.sever_lot == true
+legal_basis:
+  - clause: Planning Act s.53(1)
+    says: An owner may apply to the consent authority for a consent to divide land.
+    url: https://www.ontario.ca/laws/statute/90p13#BK83
+  - clause: Planning Act s.51(24)
+    says: The criteria for a consent, including conformity with the Official Plan and the suitability of the land.
+    url: https://www.ontario.ca/laws/statute/90p13#BK77
+  - clause: Official Plan policy 4.1.5
+    says: Development in Neighbourhoods must respect and reinforce the existing physical character, including the prevailing lot pattern.
+    url: https://www.toronto.ca/city-government/planning-development/official-plan-guidelines/official-plan/
+  - clause: 10.20.30.20(1)
+    says: Minimum lot frontage in the RD zone is the f value in the zone label, or 12.0 m where there is none.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter10_20.htm
+  - clause: 10.20.30.10(1)
+    says: Minimum lot area in the RD zone is the a value in the zone label, or frontage times 30 m where there is none.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter10_20.htm
+mechanics:
+  - Compare the frontage and the area of each new lot with the zone minimums. The lot analysis shows this.
+  - Check how many lots on the street already have the new frontage. The Committee weighs the prevailing lot pattern.
+  - File the consent application and, if needed, the minor variance applications for both new lots at the same time.
+  - Plan for conditions such as servicing, parkland dedication, tree protection and the demolition of a house that straddles the line.
+risks:
+  - A street with few narrow lots is a hard case. The Official Plan test on physical character is the usual reason for refusal.
+  - A house that straddles the new line must be demolished or cut back. This changes the cost of the whole plan.
+  - Consents expire if the conditions are not met within the time the Committee sets.
+  - Parkland dedication and development charges apply to the new lot.
+  - Refusals are often appealed to the Toronto Local Appeal Body by either side. This adds a year or more.
+buyer_questions:
+  - What frontage and area would each new lot have, and what does the zone require?
+  - How many lots on this street are already that narrow?
+  - Does the existing house fit on one of the new lots, or must it come down?
+  - Who carries the cost if the consent is refused or appealed?
+professional_notes:
+  - Pull the consent decisions within 500 m and their variance tables.
+  - Check the Toronto Local Appeal Body record for the street; a recent refusal on appeal is a strong signal.
+cost_band: high
+time_band: half_year
+precedent_work_types: [Consent, New R Building]

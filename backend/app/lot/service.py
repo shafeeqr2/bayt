@@ -45,13 +45,22 @@ def analyze_listing(
     if listing.latitude is None or listing.longitude is None:
         raise ListingNotLocated("Listing has no coordinates.")
     cached = session.get(LotAnalysisCache, listing.id)
-    if cached and not refresh and datetime.now(timezone.utc) - cached.computed_at < CACHE_TTL:
+    if cached and not refresh and datetime.now(timezone.utc) - cached.computed_at < CACHE_TTL and _current_shape(cached.result):
         try:
             return LotAnalysis.model_validate(cached.result)
         except ValidationError:
             pass  # computed by an older version of the analysis; recompute below
 
-    result = analyze_point(listing.latitude, listing.longitude, gis)
+    try:
+        result = analyze_point(listing.latitude, listing.longitude, gis)
+    except GISError:
+        # The city's GIS is flaky. An older cached result beats an error while it recovers.
+        if cached and not refresh:
+            try:
+                return LotAnalysis.model_validate(cached.result)
+            except ValidationError:
+                pass
+        raise
     _cross_check_listing(result, listing)
     row = cached or LotAnalysisCache(listing_id=listing.id)
     row.parcel_id = result.parcel.parcel_id
@@ -62,6 +71,15 @@ def analyze_listing(
     # The garden suite and severance verdicts feed the strategy search.
     strategy_estimate.refresh(session, listing)
     return result
+
+
+# Optional fields added since the first release. A cached result that lacks one was
+# computed by an older analysis and would validate with the field silently None.
+REQUIRED_KEYS = ("envelope",)
+
+
+def _current_shape(result: dict) -> bool:
+    return all(key in result for key in REQUIRED_KEYS)
 
 
 def listed_lot_area_m2(lot_size: str | None) -> float | None:

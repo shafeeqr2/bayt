@@ -1,0 +1,54 @@
+id: houseplex-removes-fsi-and-raises-coverage
+name: Add a second unit so the floor space index limit no longer applies and coverage rises to 45%
+category: as_of_right
+summary: >
+  Since the 2023 multiplex changes, a detached or semi-detached house with 2 to 4 units is a
+  houseplex. In the low-rise zones the floor space index limit does not apply to a houseplex
+  or to a building with a secondary suite, and lot coverage may rise to 45% where the overlay
+  says less. Height, setbacks, depth and length still apply.
+decision_body: Toronto Building (permit review, no Committee hearing)
+covers: [fsi, lot_coverage, units]
+trigger:
+  all:
+    - zoning.low_rise == true
+    - zoning.as_of_right_units >= 2
+    - any:
+        - gap.fsi.status == short
+        - gap.lot_coverage.status == short
+    - any:
+        - intent.proposed_units is null
+        - intent.proposed_units == 1
+legal_basis:
+  - clause: 10.20.40.40(1)(C)
+    says: The floor space index limit does not apply to a detached houseplex or to a building with a secondary suite.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter10_20.htm
+  - clause: 10.20.30.40(1)(D)
+    says: Where the Lot Coverage Overlay value is below 45, a houseplex or a building with a secondary suite may cover 45% of the lot.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter10_20.htm
+  - clause: 10.20.40.10(1)(C)
+    says: A detached houseplex may be the greater of the HT value or 10.0 m in height.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter10_20.htm
+  - clause: 10.5.20.40
+    says: A detached house may be converted to a detached houseplex; additions must comply or get a variance.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter10_5.htm
+mechanics:
+  - Add a dwelling unit to the plan. The unit must be a real dwelling unit with its own kitchen, bathroom and entrance under the Ontario Building Code.
+  - Ask Toronto Building to review the drawings as a houseplex. The zoning notice will drop the floor space index line.
+  - Design the rest of the building to meet height, main wall height, setbacks, depth and length.
+risks:
+  - The relief is only from floor space index and coverage. Height, main wall height, setbacks, depth and length still apply.
+  - The second unit must meet the Ontario Building Code for fire separation, sound and exits. This adds cost.
+  - The unit has to exist when the permit closes. Removing it later may make the building non-compliant.
+  - Parking rules for the extra unit may apply, depending on the parking zone.
+  - A rental unit changes insurance, tax and financing. Ask the lender before you count on this.
+  - The RS, RT and RM zones have the same rule under their own clause numbers; confirm the clause for this zone.
+buyer_questions:
+  - Would the plan work with a second unit, and would you rent it or use it as an in-law suite?
+  - Has the designer confirmed that the second unit meets the Building Code as a separate dwelling unit?
+  - Does the lender accept a 2-unit house at the price you plan to pay?
+professional_notes:
+  - Confirm the as-of-right unit count for this parcel, 4 or 6.
+  - Check whether the unit count changes the parking requirement in Chapter 200.
+cost_band: low
+time_band: weeks
+precedent_work_types: [R Addition, New R Building]

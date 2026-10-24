@@ -1,0 +1,46 @@
+id: narrow-lot-addition-keeps-side-setback
+name: Side or rear addition on a narrow lot may keep the existing side setback
+category: as_of_right
+summary: >
+  On lots with a frontage of 12.2 m or less, the by-law lets an addition follow the
+  existing side setback instead of the full required setback. Below 9.0 m of frontage the
+  existing setback applies as is. From 9.0 m to 12.2 m the greater of half the required
+  setback or the existing setback applies.
+decision_body: Toronto Building (zoning examiner at permit review)
+covers: [side_setback]
+trigger:
+  all:
+    - building.exists == true
+    - intent.project in [addition, unknown]
+    - gap.side_setback.status == short
+    - parcel.frontage_m <= 12.2
+legal_basis:
+  - clause: 10.5.40.71(3)
+    says: On a lot with frontage of 12.2 m or less, an addition above an existing building may follow the existing side setback.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter10_5.htm
+  - clause: 10.5.40.71(4)(A)
+    says: On a lot with frontage under 9.0 m, a rear or side addition may keep the existing side setback.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter10_5.htm
+  - clause: 10.5.40.71(4)(B)
+    says: From 9.0 m to 12.2 m of frontage, the greater of 50% of the required side setback or the existing setback applies.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter10_5.htm
+mechanics:
+  - Measure the lot frontage the way the by-law does, between the side lot lines at the front yard setback.
+  - Measure the existing side setback on the side of the addition.
+  - Design the addition in line with the existing side wall. Do not go closer to the lot line than the existing wall.
+  - Ask for a zoning review to confirm the frontage band and the setback that applies.
+risks:
+  - The relief is only for the side setback. Height, depth, length, coverage and floor space index still apply to the addition.
+  - The frontage must be measured as the by-law measures it. A lot that measures 12.3 m gets no relief.
+  - Windows and doors in the side wall may still need a larger setback under the Ontario Building Code.
+  - The existing building must be lawful. An unpermitted wall gives no right to follow.
+buyer_questions:
+  - What is the lot frontage as the by-law measures it?
+  - Will the addition line up with the existing side wall, or go closer to the lot line?
+  - Does the addition also need relief for height, depth or coverage?
+professional_notes:
+  - Check which frontage band applies and whether the existing setback or 50% of the required setback governs.
+  - Confirm the permit history of the existing side wall.
+cost_band: none
+time_band: weeks
+precedent_work_types: [R Addition]

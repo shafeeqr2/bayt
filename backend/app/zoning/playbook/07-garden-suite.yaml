@@ -1,0 +1,59 @@
+id: garden-suite-as-of-right
+name: Garden suite in the rear yard, permitted without a variance
+category: as_of_right
+summary: >
+  Chapter 150.7 permits a separate dwelling unit in an ancillary building in the rear yard
+  of a low-rise residential lot. The suite needs a set separation from the house, a rear
+  setback, side setbacks, a floor area cap and a share of soft landscaping. It also needs
+  a fire access path from the street under the Ontario Building Code.
+decision_body: Toronto Building (permit review, no Committee hearing)
+covers: [units]
+trigger:
+  all:
+    - zoning.low_rise == true
+    - garden_suite.verdict in [likely, possible]
+    - any:
+        - intent.project == garden_suite
+        - gap.units.status == short
+        - intent.proposed_units >= 2
+legal_basis:
+  - clause: 150.7.60.40(1)
+    says: Height is 4.0 m if the suite is less than 7.5 m from the house, and 6.3 m if it is 7.5 m or more away.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter150_7.htm
+  - clause: 150.7.60.50(4)
+    says: Floor area is 120 m2 at most, or 60 m2 for a one-storey suite.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter150_7.htm
+  - clause: 150.7.60.30(1)
+    says: Separation from the house is 4.0 m for a suite up to 4.0 m tall and 7.5 m for a taller suite.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter150_7.htm
+  - clause: 150.7.60.20(2)(B)
+    says: Rear setback is 1.5 m.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter150_7.htm
+  - clause: 150.7.60.20(5)
+    says: Side setback is the greater of 0.6 m or 10% of lot frontage, up to 3.0 m, or 1.5 m where the side wall has openings.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter150_7.htm
+  - clause: 150.7.60.70(1)(B)
+    says: All ancillary buildings together, including the suite, may cover 20% of the lot.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter150_7.htm
+mechanics:
+  - Check the lot analysis for the rear yard depth, the buildable box and the side access width.
+  - Choose a one-storey suite within 7.5 m of the house, or a taller suite 7.5 m or more away.
+  - Keep a 1.0 m clear path from the street to the suite entrance for fire access, with the entrance within 45 m of the street.
+  - Apply for a building permit. No Committee of Adjustment hearing is needed when every standard is met.
+risks:
+  - A suite that misses one standard needs a minor variance after all. Common misses are the separation distance and the side access width.
+  - A lot that abuts a lane follows the laneway suite rules in Chapter 150.8 instead.
+  - Trees in the rear yard bring the tree protection by-law into the file. A protected tree can stop the suite.
+  - Servicing can be expensive. The suite needs water, sewer and power from the house or the street.
+  - The suite counts toward the unit total and the ancillary coverage cap. An existing garage may have to go.
+buyer_questions:
+  - How big a garden suite fits on this lot, and how tall can it be?
+  - Is there a 1.0 m clear path from the street to the rear yard?
+  - Are there protected trees in the rear yard?
+  - What would servicing the suite cost?
+professional_notes:
+  - Confirm the separation and the height band with the lot analysis before the client budgets a 2-storey suite.
+  - Check for ravine, flood or heritage overlays that remove the permission.
+cost_band: low
+time_band: weeks
+precedent_work_types: [Garden Suite, R Addition]

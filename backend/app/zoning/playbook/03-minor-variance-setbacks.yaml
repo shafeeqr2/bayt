@@ -1,0 +1,53 @@
+id: minor-variance-setbacks
+name: Minor variance for a front, side or rear yard setback
+category: minor_variance
+summary: >
+  The Committee of Adjustment may permit a smaller setback if the change meets the 4 tests
+  of section 45(1) of the Planning Act: it is minor, it is desirable for the appropriate
+  development of the land, and it keeps the general intent of both the Official Plan and
+  the Zoning By-law. Small setback changes in line with the street are the most common
+  variance in Toronto.
+decision_body: Committee of Adjustment
+covers: [front_setback, side_setback, rear_setback]
+trigger:
+  any:
+    - gap.front_setback.status == short
+    - gap.side_setback.status == short
+    - gap.rear_setback.status == short
+legal_basis:
+  - clause: Planning Act s.45(1)
+    says: The Committee of Adjustment may authorize a minor variance from a zoning by-law if the 4 tests are met.
+    url: https://www.ontario.ca/laws/statute/90p13#BK73
+  - clause: 10.20.40.70(3)
+    says: Side yard setback in the RD zone by required lot frontage, from 0.6 m to 3.0 m.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter10_20.htm
+  - clause: 10.20.40.70(2)
+    says: Rear yard setback in the RD zone is the greater of 7.5 m or 25% of lot depth.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter10_20.htm
+  - clause: 10.20.40.70(1)
+    says: Front yard setback in the RD zone is 6.0 m unless the averaging rule in 10.5.40.70(1) applies.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter10_20.htm
+mechanics:
+  - Get a zoning review from Toronto Building. The zoning notice lists each variance with the required and the proposed value.
+  - File the application with the Committee of Adjustment for the district. Include the survey, the drawings and the zoning notice.
+  - Notify the neighbours. The city posts a sign and mails a notice.
+  - Attend the hearing. The planner's report and the neighbours' letters shape the decision.
+  - Wait out the 20-day appeal period after the decision.
+risks:
+  - The decision is not certain. Approval rates differ by street and by the size of the ask. Look at the nearby decisions first.
+  - A neighbour or the city may appeal to the Toronto Local Appeal Body. An appeal adds months and cost.
+  - Approval often comes with conditions, such as a tree protection plan or a limit on windows in the side wall.
+  - A variance is for the drawings that were filed. A later change to the design may need a new application.
+  - The variance does not remove the Ontario Building Code limits on openings near a lot line.
+buyer_questions:
+  - How large is the setback reduction, in metres and as a share of the requirement?
+  - How many similar variances were approved and refused on this street in the last 5 years?
+  - Who pays for the application, the drawings and a possible appeal if the sale closes first?
+  - Is the offer conditional on the variance?
+professional_notes:
+  - Pull the Committee of Adjustment decisions within 500 m with the same work type and standard.
+  - Check for an active neighbourhood association that objects to this type of relief.
+  - Check whether the planner's report for similar files recommended refusal.
+cost_band: medium
+time_band: months
+precedent_work_types: [R Addition, New R Building]

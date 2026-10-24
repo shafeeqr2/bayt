@@ -1,0 +1,53 @@
+id: minor-variance-height-depth-length
+name: Minor variance for height, storeys, building depth or building length
+category: minor_variance
+summary: >
+  The Committee of Adjustment may permit a taller, deeper or longer building under section
+  45(1) of the Planning Act. Height is tested against the neighbours. Depth and length are
+  tested against the rear yards of the street. A third storey or a rear extension beyond the
+  neighbours is a common request.
+decision_body: Committee of Adjustment
+covers: [height, storeys, building_depth, building_length]
+trigger:
+  any:
+    - gap.height.status == short
+    - gap.storeys.status == short
+    - gap.building_depth.status == short
+    - gap.building_length.status == short
+legal_basis:
+  - clause: Planning Act s.45(1)
+    says: The Committee of Adjustment may authorize a minor variance from a zoning by-law if the 4 tests are met.
+    url: https://www.ontario.ca/laws/statute/90p13#BK73
+  - clause: 10.20.40.10(1)
+    says: Height in the RD zone is the HT value on the Height Overlay Map, or 10.0 m where there is none.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter10_20.htm
+  - clause: 10.20.40.30(1)
+    says: The rear main wall of a detached house in the RD zone may be no more than 19.0 m from the required front yard setback.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter10_20.htm
+  - clause: 10.20.40.20(1)
+    says: Building length in the RD zone is 17.0 m where the required frontage is 18.0 m or less.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter10_20.htm
+  - clause: 10.5.40.10(1)
+    says: Height is measured from established grade to the highest point of the building.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter10_5.htm
+mechanics:
+  - Have a surveyor set the established grade. Height is measured from it, not from the sidewalk.
+  - Get a zoning review that lists the height, depth and length variances with their numbers.
+  - Check the nearby decisions for the approved depth and height on this street.
+  - File the application with the Committee of Adjustment. Attend the hearing.
+risks:
+  - Depth beyond the neighbours' rear walls draws objections about shadow and privacy. Refusals are common when the extension is large.
+  - Main wall height has its own limit in 10.20.40.10(2). A taller building may need that variance too.
+  - Height is measured from established grade. A sloped lot can add or remove a storey from the count.
+  - Trees near the rear wall bring the tree protection by-law into the file.
+  - A refusal can be appealed to the Toronto Local Appeal Body. This adds months.
+buyer_questions:
+  - How far beyond the neighbours' rear walls does the plan go?
+  - What height does the plan need, and how was established grade set?
+  - What did the Committee approve for depth on this street in the last 5 years?
+professional_notes:
+  - Compare the proposed rear wall with the rear walls on both sides. A plan within 1 to 2 m of them usually does better.
+  - Check whether the Height Overlay Map sets a value for this lot.
+cost_band: medium
+time_band: months
+precedent_work_types: [R Addition, New R Building]

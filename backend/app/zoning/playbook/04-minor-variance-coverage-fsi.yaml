@@ -1,0 +1,48 @@
+id: minor-variance-coverage-fsi
+name: Minor variance for lot coverage or floor space index
+category: minor_variance
+summary: >
+  The Committee of Adjustment may permit more lot coverage or a higher floor space index
+  under section 45(1) of the Planning Act. Density variances are judged against the pattern
+  of the street. A small increase over the by-law in a street where similar increases were
+  approved is common. A large increase is often refused or appealed.
+decision_body: Committee of Adjustment
+covers: [lot_coverage, fsi]
+trigger:
+  any:
+    - gap.lot_coverage.status == short
+    - gap.fsi.status == short
+legal_basis:
+  - clause: Planning Act s.45(1)
+    says: The Committee of Adjustment may authorize a minor variance from a zoning by-law if the 4 tests are met.
+    url: https://www.ontario.ca/laws/statute/90p13#BK73
+  - clause: 10.20.30.40(1)
+    says: Lot coverage in the RD zone comes from the Lot Coverage Overlay Map.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter10_20.htm
+  - clause: 10.20.40.40(1)
+    says: Floor space index in the RD zone is the d value in the zone label.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter10_20.htm
+  - clause: 10.5.40.40(3)
+    says: Basement floor area, some voids and parking spaces may be left out of gross floor area for houses.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter10_5.htm
+mechanics:
+  - Have the designer calculate gross floor area the way the by-law counts it. Basements, some voids and garages may not count.
+  - Get a zoning review. The notice gives the required and the proposed floor space index and coverage.
+  - Check the nearby decisions for the approved range on this street.
+  - File the application with the Committee of Adjustment. Attend the hearing.
+risks:
+  - Density is the variance that neighbours contest most. The approval rate falls as the increase grows.
+  - The Committee may approve a smaller number than the one requested.
+  - A refusal can be appealed, but an appeal costs more than the application and takes many months.
+  - The floor space index calculation has rules. A number from the real estate listing is not the by-law number.
+  - If the building also has a secondary suite or is a houseplex, the floor space index limit may not apply at all. Check the houseplex card first.
+buyer_questions:
+  - What floor space index and coverage does the plan need, and what does the by-law allow?
+  - What is the largest floor space index approved on this street in the last 5 years?
+  - Does the design count the basement and garage correctly?
+professional_notes:
+  - Compare the ask with the median approved increase within 500 m for the same work type.
+  - Confirm whether 10.x.40.40(1)(C) removes the floor space index limit for the proposed unit count.
+cost_band: medium
+time_band: months
+precedent_work_types: [R Addition, New R Building]

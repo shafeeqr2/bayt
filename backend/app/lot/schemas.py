@@ -89,6 +89,29 @@ class GardenSuiteInfo(BaseModel):
     notes: list[str]
 
 
+class EnvelopeInfo(BaseModel):
+    """Where the main building sits on the lot, measured the way the by-law measures setbacks.
+
+    All values are for the main building only (ancillary buildings ignored) and
+    are approximate on irregular lots. `None` when there is no main building.
+    """
+
+    front_setback_m: float | None = Field(None, description="Front lot line to the front main wall")
+    rear_setback_m: float | None = Field(None, description="Rear main wall to the rear lot line")
+    side_setback_left_m: float | None
+    side_setback_right_m: float | None
+    side_setback_min_m: float | None = Field(None, description="The smaller side yard; the by-law tests each side")
+    building_length_m: float | None = Field(None, description="Front main wall to rear main wall")
+    building_depth_m: float | None = Field(
+        None, description="Rear main wall measured from the required 6.0 m front yard setback (By-law 10.x.40.30)"
+    )
+    building_width_m: float | None
+    height_m: float | None = Field(None, description="LiDAR height of the tallest main building piece")
+    existing_side_setback_required_m: float | None = Field(
+        None, description="Side setback the by-law requires for this lot's minimum frontage (10.x.40.70(3))"
+    )
+
+
 class BuildingProperties(BaseModel):
     building_id: int | None
     kind: str
@@ -123,6 +146,7 @@ class LotAnalysis(BaseModel):
     zoning: ZoningInfo
     severance: SeveranceInfo
     garden_suite: GardenSuiteInfo
+    envelope: EnvelopeInfo | None = Field(None, description="Existing main building position; None when vacant")
     geometry: LotGeometry
     caveats: list[str]
     sources: list[str]

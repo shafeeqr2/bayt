@@ -1,0 +1,35 @@
+id: appeal-refusal-to-tlab
+name: Appeal a Committee of Adjustment refusal to the Toronto Local Appeal Body
+category: appeal
+summary: >
+  A refusal, or an approval that a neighbour contests, can be appealed within 20 days to the
+  Toronto Local Appeal Body. The hearing is a fresh hearing with witnesses. This route only
+  exists after a Committee decision. It is listed here so a buyer can budget for it.
+decision_body: Toronto Local Appeal Body
+covers: []
+trigger:
+  all:
+    - gaps.count_short >= 1
+legal_basis:
+  - clause: Planning Act s.45(12)
+    says: An applicant or any person who filed a submission may appeal a Committee of Adjustment decision within 20 days.
+    url: https://www.ontario.ca/laws/statute/90p13#BK73
+  - clause: City of Toronto Act s.115
+    says: The city may set up a local appeal body for minor variance and consent appeals.
+    url: https://www.ontario.ca/laws/statute/06c11#BK146
+mechanics:
+  - File the appeal with the Committee of Adjustment within 20 days of the decision notice.
+  - Prepare witness statements, usually from a land use planner.
+  - Attend the hearing. The Toronto Local Appeal Body issues a written decision with reasons.
+risks:
+  - An appeal usually needs a planner and sometimes a lawyer. The cost can exceed the cost of the application many times over.
+  - The timeline is months. A purchase that waits for the appeal carries the carrying cost.
+  - A neighbour may appeal an approval. Even a win at the Committee is not final until the appeal period ends.
+buyer_questions:
+  - If the Committee refuses, would you appeal, and what would that cost?
+  - Does the offer give enough time for an appeal?
+professional_notes:
+  - Pull the Toronto Local Appeal Body decisions for the street. The written reasons show what the members weigh.
+cost_band: high
+time_band: half_year
+precedent_work_types: []

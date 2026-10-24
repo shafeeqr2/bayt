@@ -1,0 +1,35 @@
+id: new-building-loses-existing-rights
+name: A new building must meet every current standard; the existing non-compliance does not carry over
+category: constraint
+summary: >
+  The existing building is short on at least 1 current standard. If it is demolished, or
+  if 50% or more of its main walls are removed or replaced, the rights that came with it end.
+  The new building must meet every current standard or get a variance for each gap.
+decision_body: Toronto Building (zoning examiner at permit review)
+covers: []
+trigger:
+  all:
+    - building.exists == true
+    - intent.keep_existing_walls == false
+    - existing.count_short >= 1
+legal_basis:
+  - clause: 5.10.1.10(4)
+    says: A building stops being lawfully existing when 50% or more of the main walls of the first storey or above are removed or replaced.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter5.htm
+  - clause: 10.5.40.71(4)
+    says: The relief for additions to existing buildings applies to additions, not to new buildings.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter10_5.htm
+mechanics:
+  - List every standard the existing building is short on. Each becomes a variance for the new building unless the design meets it.
+  - Compare with the alteration route. Keeping the main walls may save several variances.
+risks:
+  - The existing house may sit closer to the lot line, deeper or taller than a new house may. A buyer who plans a rebuild cannot assume the same envelope.
+  - Each variance has its own chance of refusal and its own appeal risk.
+buyer_questions:
+  - Which of the existing house's setbacks, height and depth would not be allowed for a new house?
+  - Would keeping the main walls avoid some of the variances?
+professional_notes:
+  - Run the gap analysis twice, once as an alteration and once as a new building, and compare the variance lists.
+cost_band: none
+time_band: weeks
+precedent_work_types: [New R Building]

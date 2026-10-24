@@ -1,0 +1,38 @@
+id: heritage-register-constraint
+name: The property is on the heritage register
+category: constraint
+summary: >
+  A listed or designated heritage property needs heritage review for alterations and a
+  separate process for demolition. This is a constraint on every other pathway, not a
+  pathway in itself.
+decision_body: Heritage Planning and, for designated properties, City Council
+covers: []
+trigger:
+  all:
+    - heritage.listed == true
+legal_basis:
+  - clause: Ontario Heritage Act s.27
+    says: The municipal heritage register lists designated properties and properties of cultural heritage value.
+    url: https://www.ontario.ca/laws/statute/90o18#BK33
+  - clause: Ontario Heritage Act s.33
+    says: Alteration of a designated property needs council consent.
+    url: https://www.ontario.ca/laws/statute/90o18#BK42
+  - clause: 5.10.40.1(6)(A)(ii)
+    says: Building regulations do not prevent work done under a Heritage Permit.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter5.htm
+mechanics:
+  - Check whether the property is listed or designated. The rules differ.
+  - Talk to Heritage Planning before the design is fixed.
+  - Budget for a heritage impact assessment if the work is large.
+risks:
+  - Demolition of a listed property needs 60 days notice to council and may lead to designation.
+  - Alterations to a designated property that affect heritage attributes need a heritage permit.
+  - Heritage review adds months to every other pathway.
+buyer_questions:
+  - Is the property listed or designated, and what are the heritage attributes?
+  - Has anyone talked to Heritage Planning about the plan?
+professional_notes:
+  - Pull the register entry and any heritage evaluation report for the property.
+cost_band: medium
+time_band: months
+precedent_work_types: []

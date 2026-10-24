@@ -1,0 +1,62 @@
+id: keep-existing-walls-alteration
+name: Keep the existing main walls so the work is an alteration, not a new building
+category: legal_non_conforming
+summary: >
+  A building that lawfully exists keeps its existing setbacks, height, depth, length,
+  coverage and floor space index as its own limits, even where they do not meet the
+  current by-law. The protection ends when 50% or more of the main walls of the first
+  storey or above are removed or replaced. An addition must not increase the non-compliance.
+decision_body: Toronto Building (zoning examiner at permit review)
+covers: [side_setback, front_setback, rear_setback, height, building_depth, building_length, lot_coverage, fsi]
+trigger:
+  all:
+    - building.exists == true
+    - intent.keep_existing_walls == true
+    - existing.count_short >= 1
+legal_basis:
+  - clause: 5.10.1.10(4)
+    says: A building stops being lawfully existing when 50% or more of the main walls of the first storey or above are removed or replaced.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter5.htm
+  - clause: 10.5.40.71(3)
+    says: On a lot with frontage of 12.2 m or less, an addition above an existing building may follow the existing side setback.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter10_5.htm
+  - clause: 10.5.40.71(4)
+    says: Rear or side additions on lots under 9.0 m frontage keep the existing side setback; from 9.0 m to 12.2 m the greater of 50% of the required setback or the existing setback applies.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter10_5.htm
+  - clause: 10.5.40.11(1)
+    says: The lawful height of an existing building is its maximum height.
+    url: https://www.toronto.ca/zoning/bylaw_amendments/ZBL_NewProvision_Chapter10_5.htm
+  - clause: 10.5.40.21(1)
+    says: The lawful length of an existing building is its maximum length.
+  - clause: 10.5.40.31(1)
+    says: The lawful depth of an existing building is its maximum depth.
+  - clause: 10.5.30.41(1)
+    says: The lawful lot coverage of existing buildings is their maximum coverage.
+  - clause: 10.5.40.41(1)
+    says: The lawful floor space index of existing buildings is their maximum.
+mechanics:
+  - Get a survey and a measured drawing of the existing main walls. Mark which walls stay.
+  - Design the work so that less than 50% of the main walls of the first storey and above are removed or replaced.
+  - Design the addition so that no existing non-compliance increases. A new part that is outside the existing envelope must meet the current standard or get a variance.
+  - Ask Toronto Building for a zoning review of the drawings before the permit application.
+  - Have a structural engineer confirm that the retained walls can carry the new work.
+risks:
+  - The 50% test is on the main walls, not on the floor area. A wall that is replaced for structural reasons during the work counts as replaced. If the count reaches 50%, the building becomes a new building and every current standard applies.
+  - The Ontario Building Code applies to all new work. The retained walls may need upgrades for fire separation, insulation and structure.
+  - The zoning examiner decides what counts as a main wall and what counts as replaced. Get this in writing before demolition starts.
+  - A wall that falls or is removed during the work ends the protection. Shoring and bracing cost money and time.
+  - The protection keeps the existing numbers. It does not permit a larger non-compliance. Any new part that is closer, taller or deeper than the existing building needs a variance.
+  - Heritage listing or designation adds a separate permit and may block the work.
+buyer_questions:
+  - Has a surveyor confirmed which walls are main walls and what share of them will stay?
+  - Has the designer confirmed in writing that the addition does not increase any existing non-compliance?
+  - Has a structural engineer looked at the walls that will stay?
+  - Was the existing building built lawfully? Ask for the permit history.
+  - What is the plan if a retained wall fails during construction?
+professional_notes:
+  - Pull the permit history to confirm the existing building and its setbacks were lawful when built.
+  - Confirm the 50% main-wall count with the zoning examiner before the client commits.
+  - Check 10.5.40.71 for the frontage bands; they change what a side addition may do.
+cost_band: low
+time_band: weeks
+precedent_work_types: [R Addition]

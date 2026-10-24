@@ -1,0 +1,51 @@
+id: rezoning-or-site-specific-exception
+name: Rezoning or site-specific exception through City Council
+category: rezoning
+summary: >
+  When the ask is too large for a minor variance, the owner applies to City Council for a
+  zoning by-law amendment under section 34 of the Planning Act. This is slow and expensive.
+  It is the route for a large increase in units, density or height in a Neighbourhood.
+decision_body: City Council, with City Planning staff review
+covers: [units, fsi, height, lot_coverage, building_depth, building_length]
+# Each branch checks "short" first, so an unknown gap gives FALSE, not "may apply".
+trigger:
+  any:
+    - all:
+        - gap.units.status == short
+        - gap.units.delta >= 3
+    - all:
+        - gap.fsi.status == short
+        - gap.fsi.relief_pct >= 0.5
+    - all:
+        - gap.height.status == short
+        - gap.height.relief_pct >= 0.3
+    - all:
+        - gap.lot_coverage.status == short
+        - gap.lot_coverage.relief_pct >= 0.5
+legal_basis:
+  - clause: Planning Act s.34
+    says: Council may pass zoning by-laws and amend them on application.
+    url: https://www.ontario.ca/laws/statute/90p13#BK52
+  - clause: Official Plan policy 4.1.5
+    says: Development in Neighbourhoods must respect and reinforce the existing physical character.
+    url: https://www.toronto.ca/city-government/planning-development/official-plan-guidelines/official-plan/
+mechanics:
+  - Hold a pre-application meeting with City Planning.
+  - File the zoning by-law amendment with the studies that staff ask for.
+  - Attend the community consultation meeting and the Community Council meeting.
+  - Council votes. The by-law can be appealed to the Ontario Land Tribunal.
+risks:
+  - The process takes a year or more and costs far more than a variance.
+  - Staff often recommend refusal in Neighbourhoods. Council usually follows staff.
+  - A refusal can be appealed to the Ontario Land Tribunal, which adds another year and legal cost.
+  - The outcome is uncertain. Do not pay a price that assumes approval.
+buyer_questions:
+  - Is this plan large enough that a variance is not realistic?
+  - Have you spoken to a planner about a pre-application meeting?
+  - What is the plan if Council refuses?
+professional_notes:
+  - Check whether the Major Streets or the sixplex permissions give a smaller version of the plan as of right.
+  - Review recent Community Council decisions in the ward for similar applications.
+cost_band: very_high
+time_band: year_plus
+precedent_work_types: []

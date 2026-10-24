@@ -30,6 +30,7 @@ from app.lot.schemas import (
     BuildingInfo,
     BuildingProperties,
     CoverageInfo,
+    EnvelopeInfo,
     GardenSuiteInfo,
     LotAnalysis,
     LotGeometry,
@@ -58,6 +59,8 @@ MIN_AREA_DEPTH_FACTOR = 30.0  # min lot area = min frontage x 30 m when no "a" v
 
 # 10.20.40.70: required side yard setback by minimum lot frontage.
 SIDE_SETBACK_TABLE = [(6.0, 0.6), (12.0, 0.9), (15.0, 1.2), (18.0, 1.5), (24.0, 1.8), (30.0, 2.4), (math.inf, 3.0)]
+
+REQUIRED_FRONT_SETBACK_M = 6.0  # 10.x.40.70(1); building depth is measured from here
 
 GARDEN_SEPARATION_M = 5.0
 GARDEN_SEPARATION_TALL_M = 7.5
@@ -410,6 +413,26 @@ def analyze(inputs: LotInputs) -> LotAnalysis:
         house_t = (min(ts), max(ts))
         house_d = (min(ds), max(ds))
 
+    # Existing building envelope ---------------------------------------------
+    envelope = None
+    if house_t is not None and house_d is not None:
+        parcel_ts = [along(x, y) for x, y in parcel_m.exterior.coords]
+        main_heights = [b.height_m for b in building_infos if b.is_main and b.height_m is not None]
+        envelope = EnvelopeInfo(
+            front_setback_m=_r(max(0.0, house_d[0] - min(0.0, min(parcel_depths)))),
+            rear_setback_m=_r(max(0.0, lot_depth - house_d[1])),
+            side_setback_left_m=_r(max(0.0, house_t[0] - min(parcel_ts))),
+            side_setback_right_m=_r(max(0.0, max(parcel_ts) - house_t[1])),
+            side_setback_min_m=_r(max(0.0, min(house_t[0] - min(parcel_ts), max(parcel_ts) - house_t[1]))),
+            building_length_m=_r(house_d[1] - house_d[0]),
+            building_depth_m=_r(house_d[1] - REQUIRED_FRONT_SETBACK_M),
+            building_width_m=_r(house_t[1] - house_t[0]),
+            height_m=max(main_heights) if main_heights else None,
+            existing_side_setback_required_m=side_setback_for_frontage(min_frontage) if min_frontage else None,
+        )
+        if irregular:
+            caveats.append("Existing building setbacks are measured on lot axes and are approximate on this irregular lot.")
+
     # Severance --------------------------------------------------------------
     severance = _severance(
         low_rise, frontage, lot_area, min_frontage, min_area, house_t, inputs, neighbours_m, street_name, confidence
@@ -455,6 +478,7 @@ def analyze(inputs: LotInputs) -> LotAnalysis:
         zoning=zoning_info,
         severance=severance,
         garden_suite=garden,
+        envelope=envelope,
         geometry=LotGeometry(
             parcel=mapping(to_deg(parcel_m)),
             buildings=on_lot_features,
