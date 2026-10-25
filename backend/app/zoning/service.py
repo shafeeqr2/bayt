@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.lot import service as lot_service
 from app.models import Listing, ListingCityData, ZoningAnswer
 from app.zoning import answer as model_answer
+from app.zoning import textrules
 from app.zoning import precedents
 from app.zoning.intent import Intent
 from app.zoning.pathways import analyze_pathways
@@ -86,7 +87,11 @@ def ask_for_listing(session: Session, listing: Listing, req: model_answer.AskReq
     notes: list[str] = []
 
     parsed_intent: Intent | None = None
-    if text:
+    if text and textrules.reads_all(text):
+        # The rules placed the project and every number: no model call, and the cache can hit at once.
+        parsed, parsed_intent = model_answer.rules_intent(text, req.mode)
+        understood = parsed.understood
+    elif text:
         try:
             parsed, parsed_intent = model_answer.parse_intent(client, text, req.mode)
             understood, unclear = parsed.understood, parsed.unclear

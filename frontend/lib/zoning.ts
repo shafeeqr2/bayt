@@ -191,7 +191,7 @@ export const FACT_LABELS: Record<string, string> = {
   "heritage.listed": "the heritage register status",
 };
 
-/** A paragraph of the written answer and the ids it rests on (card:, clause:, gap:, file:). */
+/** A paragraph of the written answer and the ids it rests on (card:, clause:, gap:, file:, files: for the counts of nearby files). */
 export type AnswerParagraph = { text: string; citations: string[] };
 export type AnswerSection = { heading: string; paragraphs: AnswerParagraph[] };
 

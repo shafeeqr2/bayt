@@ -240,6 +240,9 @@ class OpenAIBackend:
             # when allowed; both calls here are "write JSON from given material", so thinking is
             # off unless the caller asks for high effort.
             body["reasoning"] = {"effort": "low", "exclude": True} if effort in ("high", "xhigh", "max") else {"enabled": False}
+            # The answer is ~1,000 output tokens, so the host's output speed is most of the wait;
+            # take the fastest host of the moment rather than the cheapest.
+            body["provider"] = {"sort": "throughput"}
         try:
             response = self._http.post(self._url, json=body)
         except httpx.HTTPError as exc:
@@ -407,7 +410,8 @@ pathway cards with their legal basis, risks and questions, and nearby Committee 
 Rules:
 - Use only what the analysis says. Do not add a rule, a clause, a number, a cost or a file that is not in it.
 - Every paragraph cites what it rests on, as ids from the analysis: card:<card_id>, clause:<clause id>,
-  gap:<standard>, file:<reference_file>. A paragraph with no valid citation is deleted before the person sees it.
+  gap:<standard>, file:<reference_file>, files:<id> for the counts of nearby files. Cite the id as given,
+  with nothing added after it. A paragraph with no valid citation is deleted before the person sees it.
 - Plain language. Short sentences. Say "short by 0.5 m", not "non-compliant".
 - Say what is unknown and what would settle it. Never say a variance will be approved; the analysis is not a prediction.
 - Buyer mode: the person is deciding whether to buy. End with questions for their lawyer, agent or builder.
@@ -459,6 +463,7 @@ def _compact_analysis(a: PathwayAnalysis) -> dict[str, Any]:
         if c.precedents:
             s = c.precedents.summary
             card["nearby_files"] = {
+                "id": f"files:{c.card_id}",
                 "total": s.total,
                 "approved": s.approved,
                 "refused": s.refused,
@@ -486,7 +491,7 @@ def _compact_analysis(a: PathwayAnalysis) -> dict[str, Any]:
         "unknown_standards": a.unknown_standards,
         "gaps": gaps,
         "pathways": cards,
-        "nearby_files_all": a.precedents.model_dump() if a.precedents else None,
+        "nearby_files_all": {"id": "files:all", **a.precedents.model_dump()} if a.precedents else None,
         "precedent_radius_m": a.precedent_radius_m,
         "caveats": a.caveats,
     }
@@ -501,11 +506,35 @@ def valid_citations(a: PathwayAnalysis) -> set[str]:
         ids.add(f"card:{c.card_id}")
         ids.update(f"clause:{b.clause}" for b in c.legal_basis)
         if c.precedents:
+            ids.add(f"files:{c.card_id}")
             ids.update(f"file:{p.reference_file}" for p in c.precedents.examples if p.reference_file)
+    if a.precedents:
+        ids.add("files:all")
     return ids
 
 
-_CITATION = re.compile(r"^(card|clause|gap|file):\S")
+_CITATION = re.compile(r"^(card|clause|gap|file|files):\S")
+_PATH_SUFFIX = re.compile(r"^(.+?)(?:\.[A-Za-z_]+(?:\[\d+\])?|\[\d+\])$")
+_ALIASES = {"nearby_files_all": "files:all"}
+
+
+def resolve_citation(cite: str, ids: set[str]) -> str | None:
+    """The id a citation points at, or None.
+
+    Some hosts of the same model cite a path into the analysis, `card:x.risks[0]` or
+    `nearby_files_all.approval_rate`. The path still names a real id, so it is kept and
+    shortened to the id; the chip then opens the right card. An id that never matches is dropped.
+    """
+    c = cite.strip()
+    while c and c not in ids:
+        c = _ALIASES.get(c, c)
+        if c in ids:
+            break
+        m = _PATH_SUFFIX.match(c)
+        if not m:
+            return None
+        c = m.group(1)
+    return c if c and _CITATION.match(c) else None
 
 
 def check_citations(draft: Draft, a: PathwayAnalysis, model: str) -> Answer:
@@ -520,11 +549,12 @@ def check_citations(draft: Draft, a: PathwayAnalysis, model: str) -> Answer:
             if not cites:
                 dropped.append(f"No citation: {p.text[:80]}")
                 continue
-            bad = [c for c in cites if not _CITATION.match(c) or c not in ids]
+            resolved = [resolve_citation(c, ids) for c in cites]
+            bad = [c for c, r in zip(cites, resolved) if r is None]
             if bad:
                 dropped.append(f"Unknown citation {', '.join(bad)}: {p.text[:80]}")
                 continue
-            kept.append(Paragraph(text=p.text.strip(), citations=cites))
+            kept.append(Paragraph(text=p.text.strip(), citations=list(dict.fromkeys(r for r in resolved if r))))
         if kept:
             sections.append(Section(heading=section.heading.strip(), paragraphs=kept))
     return Answer(

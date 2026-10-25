@@ -31,7 +31,11 @@ def _num(raw: str) -> float:
     return float(raw.replace(",", ""))
 
 
-def _length(text: str, before: tuple[str, ...] = (), after: tuple[str, ...] = ()) -> float | None:
+Span = tuple[int, int]
+Hit = tuple[float, Span]
+
+
+def _length(text: str, before: tuple[str, ...] = (), after: tuple[str, ...] = ()) -> Hit | None:
     """`<before label> ... 6.5 m` or `6.5 m <after label>`; feet are converted. The first match wins.
 
     A label like "high" only goes after the number: "10.5 m high and a rear yard of 6.5 m"
@@ -41,16 +45,16 @@ def _length(text: str, before: tuple[str, ...] = (), after: tuple[str, ...] = ()
         for pattern, scale in ((rf"{label}[^.\d]{{0,40}}?{_NUM}{_M}", 1.0), (rf"{label}[^.\d]{{0,40}}?{_NUM}{_FT}", FT)):
             m = re.search(pattern, text, re.I)
             if m:
-                return round(_num(m.group(1)) * scale, 2)
+                return round(_num(m.group(1)) * scale, 2), m.span()
     for label in after:
         for pattern, scale in ((rf"{_NUM}{_M}\s+{label}", 1.0), (rf"{_NUM}{_FT}\s+{label}", FT)):
             m = re.search(pattern, text, re.I)
             if m:
-                return round(_num(m.group(1)) * scale, 2)
+                return round(_num(m.group(1)) * scale, 2), m.span()
     return None
 
 
-def _area(text: str, *labels: str) -> float | None:
+def _area(text: str, *labels: str) -> Hit | None:
     for label in labels:
         for pattern, scale in (
             (rf"{label}[^.\d]{{0,40}}?{_NUM}{_M2}", 1.0),
@@ -60,7 +64,7 @@ def _area(text: str, *labels: str) -> float | None:
         ):
             m = re.search(pattern, text, re.I)
             if m:
-                return round(_num(m.group(1)) * scale, 1)
+                return round(_num(m.group(1)) * scale, 1), m.span()
     return None
 
 
@@ -73,8 +77,27 @@ def _count(raw: str) -> int | None:
 
 def extract(text: str) -> dict[str, Any]:
     """Fields of `Intent` the text states. Missing keys mean "not said"."""
+    return _extract(text)[0]
+
+
+def reads_all(text: str) -> bool:
+    """True when the rules alone are enough and the model parse can be skipped.
+
+    The rules must have read the project, and every digit in the text must sit inside a phrase
+    the rules matched. A number the rules did not place ("the lot is 7.6 m wide", "built in 1952")
+    means the model should read the text, since it may be a field the rules do not know.
+    """
+    fields, spans = _extract(text)
+    if "project" not in fields:
+        return False
+    t = " ".join(text.split())
+    return all(any(a <= m.start() < b for a, b in spans) for m in re.finditer(r"\d", t))
+
+
+def _extract(text: str) -> tuple[dict[str, Any], list[Span]]:
     t = " ".join(text.split())
     out: dict[str, Any] = {}
+    spans: list[Span] = []
 
     # Project and walls. Suites and severance first: "build a new garden suite" is not a tear-down.
     if re.search(r"\blaneway\s+(?:suite|house)\b", t, re.I):
@@ -96,15 +119,18 @@ def extract(text: str) -> dict[str, Any]:
     m = re.search(r"\b(second|third|fourth|2nd|3rd|4th)[\s-]+(?:storey|story|floor|level)\b", t, re.I)
     if m:
         out["proposed_storeys"] = _count(m.group(1))
+        spans.append(m.span())
     else:
         m = re.search(r"\b(\d|one|two|three|four|five|six)[\s-]+(?:storeys?|stories|story|floors?)\b", t, re.I)
         if m:
             out["proposed_storeys"] = _count(m.group(1))
+            spans.append(m.span())
 
     # Units: "4 units", "fourplex", "triplex".
     m = re.search(r"\b(\d|one|two|three|four|five|six)\s+(?:dwelling\s+|residential\s+)?units?\b", t, re.I)
     if m:
         out["proposed_units"] = _count(m.group(1))
+        spans.append(m.span())
     else:
         m = re.search(r"\b(duplex|triplex|fourplex|quadplex|sixplex)\b", t, re.I)
         if m:
@@ -112,7 +138,8 @@ def extract(text: str) -> dict[str, Any]:
 
     height = _length(t, before=(r"(?:building\s+)?height(?:\s+of)?",), after=(r"(?:high|tall)\b",))
     if height is not None:
-        out["proposed_height_m"] = height
+        out["proposed_height_m"], span = height
+        spans.append(span)
 
     for field, label in (
         ("proposed_rear_setback_m", r"(?:rear|back)\s+(?:yard|setback)"),
@@ -124,15 +151,18 @@ def extract(text: str) -> dict[str, Any]:
         # "rear yard of 6.5 m" and "a 6.5 m rear yard" both count.
         value = _length(t, before=(label + r"(?:\s+(?:is|of|to|at))?",), after=(label,))
         if value is not None:
-            out[field] = value
+            out[field], span = value
+            spans.append(span)
 
     gfa = _area(t, r"(?:gross\s+)?floor\s+(?:area|space)(?:\s+of)?", r"\bgfa\b")
     if gfa is not None:
-        out["proposed_gfa_m2"] = gfa
+        out["proposed_gfa_m2"], span = gfa
+        spans.append(span)
     footprint = _area(t, r"footprint(?:\s+of)?", r"ground\s+(?:floor\s+)?area(?:\s+of)?")
     if footprint is not None:
-        out["proposed_footprint_m2"] = footprint
-    return out
+        out["proposed_footprint_m2"], span = footprint
+        spans.append(span)
+    return out, spans
 
 
 LABELS = {

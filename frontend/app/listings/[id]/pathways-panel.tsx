@@ -251,7 +251,7 @@ function Understood({ result }: { result: AskResponse }) {
   );
 }
 
-const CITATION_LABELS: Record<string, string> = { card: "route", clause: "by-law", gap: "standard", file: "file" };
+const CITATION_LABELS: Record<string, string> = { card: "route", clause: "by-law", gap: "standard", file: "file", files: "nearby files" };
 
 function Citation({ id }: { id: string }) {
   const [kind, ...rest] = id.split(":");

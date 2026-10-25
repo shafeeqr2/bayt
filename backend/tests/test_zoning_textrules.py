@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.zoning.textrules import describe, extract
+from app.zoning.textrules import describe, extract, reads_all
 
 
 def test_addition_with_storey_height_and_rear_yard():
@@ -52,3 +52,16 @@ def test_describe_lines():
     assert lines == ["Addition, main walls kept", "Storeys 3", "Height 10.5 m", "Rear yard 6.5 m"]
     assert describe({}) == []
     assert describe({"keep_existing_walls": False}) == ["Main walls removed"]
+
+
+def test_reads_all_when_every_number_is_placed():
+    assert reads_all("Keep the house and add a third storey about 10.5 m high, then push the back wall out so the rear yard is 6.5 m.")
+    assert reads_all("Tear it down and build a new 2 storey house, 30 feet high, with a 25 ft rear yard")
+    assert reads_all("A garden suite in the back")  # a project and no numbers at all
+
+
+def test_reads_all_false_when_a_number_is_loose_or_the_project_is_unknown():
+    assert not reads_all("Add a second storey; the lot is 7.6 m wide")  # 7.6 is not a field the rules know
+    assert not reads_all("Keep the walls, it was built in 1952")
+    assert not reads_all("10.5 m high with a 6.5 m rear yard")  # numbers placed, project unknown
+    assert not reads_all("Hello, what can I do with this place?")

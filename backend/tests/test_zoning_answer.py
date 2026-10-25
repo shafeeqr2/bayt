@@ -181,6 +181,38 @@ def test_check_citations_drops_uncited_and_unknown_paragraphs(analysis):
     assert out.model == "test-model" and out.questions == ["Ask about the rear yard."]
 
 
+def test_citation_paths_resolve_to_their_id(analysis):
+    ids = m.valid_citations(analysis)
+    assert m.resolve_citation("card:keep-existing-walls-alteration.risks[0]", ids) == "card:keep-existing-walls-alteration"
+    assert m.resolve_citation("gap:rear_setback.delta", ids) == "gap:rear_setback"
+    assert m.resolve_citation("card:nope.risks[0]", ids) is None
+    assert m.resolve_citation("risks[0]", ids) is None
+    # A clause id has dots of its own and matches as given.
+    clause = next(c for c in ids if c.startswith("clause:"))
+    assert m.resolve_citation(clause, ids) == clause
+
+
+def test_precedent_counts_are_citable(analysis):
+    ids = m.valid_citations(analysis)
+    compact = m._compact_analysis(analysis)
+    if analysis.precedents:
+        assert "files:all" in ids and compact["nearby_files_all"]["id"] == "files:all"
+        assert m.resolve_citation("nearby_files_all.approval_rate", ids) == "files:all"
+    for card in compact["pathways"]:
+        if "nearby_files" in card:
+            assert card["nearby_files"]["id"] in ids
+    draft = m.Draft(
+        headline="h",
+        sections=[m.Section(heading="Neighbours", paragraphs=[
+            m.Paragraph(text="Most nearby files were approved.", citations=["card:keep-existing-walls-alteration.summary", "card:keep-existing-walls-alteration"]),
+        ])],
+        questions=[], unknowns=[],
+    )
+    out = m.check_citations(draft, analysis, "test-model")
+    assert out.dropped == []
+    assert out.sections[0].paragraphs[0].citations == ["card:keep-existing-walls-alteration"]
+
+
 def test_write_answer_passes_the_compact_analysis(analysis):
     draft = m.Draft(headline="h", sections=[], questions=[], unknowns=[])
     client = FakeClient(draft)
@@ -284,6 +316,8 @@ def test_openai_backend_sends_json_schema_and_parses_the_reply():
     assert "properties" in body["response_format"]["json_schema"]["schema"]
     assert body["messages"][0]["role"] == "system" and body["messages"][0]["content"].startswith("sys")
     assert body["messages"][1] == {"role": "user", "content": "usr"}
+    assert body["reasoning"] == {"enabled": False}
+    assert body["provider"] == {"sort": "throughput"}  # the fastest host of the moment, not the cheapest
 
 
 @pytest.mark.parametrize(

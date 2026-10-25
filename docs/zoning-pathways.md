@@ -198,16 +198,38 @@ one of 2 backends, picked from the key in `LLM_API_KEY`:
 
 The OpenAI backend validates the reply against the pydantic schema itself, so a
 provider that ignores the schema still cannot slip a wrong shape through. On
-OpenRouter it turns the model's hidden reasoning off for the parse and down to
-"low" for the answer; Nemotron otherwise spends the whole output budget thinking.
-Without a key both calls raise `ModelUnavailable` and the endpoint returns the
+OpenRouter it turns the model's hidden reasoning off for both calls (Nemotron
+otherwise spends the whole output budget thinking, for minutes) and asks for the
+host with the highest throughput (`provider: {sort: throughput}`). Without a
+key both calls raise `ModelUnavailable` and the endpoint returns the
 deterministic analysis with a note. Nothing else changes.
 
-Measured on 2026-10-24 with `nvidia/nemotron-3-super-120b-a12b` on OpenRouter:
-the parse plus the answer took about 80 s and cost well under 1 cent. A smaller
-model sometimes writes `proposed_rear_setback_m = 6.5` in its `understood` notes
-and leaves the field null; `backfill_from_understood` takes such a line for an
-empty field.
+Speed, measured on 2026-10-25 with `nvidia/nemotron-3-super-120b-a12b` on
+OpenRouter. The wait is almost all output speed: the answer is about 1,000
+tokens of JSON and a host writes 35 to 170 of them a second, so the host
+matters more than anything in our code.
+
+| Question | Before | After |
+|---|---|---|
+| New question, rules read the whole text | 34 s | 5 s |
+| New question, the model must read the text | 34 s | 6 to 7 s |
+| Same plan again (cache) | 10 s | 0.3 s |
+
+3 changes made the difference: the host sort (the write call went from 29 s on
+one host to 6 s on another); `textrules.reads_all` skips the model parse when
+the rules placed the project and every digit in the text, so a cached plan
+needs no model call at all; and nothing else, the prompts are unchanged. Cost
+stays well under 1 cent a question.
+
+Smaller NVIDIA models were tried on the same lot and rejected:
+`nemotron-3-nano-30b-a3b` invents fields in the parse (a rear yard also became
+the building depth) and lists every unknown standard as a shortfall;
+`nemotron-3.5-lightning` answers in 2 s but writes 1 thin section and puts the
+citations in the prose. `ZONING_MODEL` still picks any of them.
+
+A smaller model sometimes writes `proposed_rear_setback_m = 6.5` in its
+`understood` notes and leaves the field null; `backfill_from_understood` takes
+such a line for an empty field.
 
 1. `parse_intent`: the person's words -> `ParsedIntent`, the same fields as
    `Intent` plus `understood` and `unclear` (what no field holds). The model
@@ -224,11 +246,15 @@ empty field.
 3. The deterministic pipeline runs on the merged intent, exactly as in phase 1.
 4. `write_answer`: `_compact_analysis` gives the model the gaps, the ranked cards
    with their legal basis, risks and questions, and the nearby files, each with
-   an id (`gap:<standard>`, `card:<id>`, `clause:<clause>`, `file:<reference>`).
+   an id (`gap:<standard>`, `card:<id>`, `clause:<clause>`, `file:<reference>`,
+   and `files:all` / `files:<card id>` for the counts of nearby files).
    The model returns a `Draft`: headline, sections of paragraphs with citations,
    questions, unknowns. Effort `medium`.
 5. `check_citations` keeps a paragraph only when every citation resolves to an
-   id in the analysis. A paragraph with no citation, a made-up clause or an
+   id in the analysis. Some hosts cite a path into the analysis
+   (`card:x.risks[0]`, `nearby_files_all.approval_rate`); `resolve_citation`
+   shortens such a path to the id it names, since the id is real. A paragraph
+   with no citation, a made-up clause or an
    unknown file is dropped and listed in `Answer.dropped`. An answer with no
    paragraph left is reported as unavailable. The model never adds a rule, a
    number or a file; it can only word what the analysis holds.
