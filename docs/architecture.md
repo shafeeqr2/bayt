@@ -12,7 +12,7 @@ Source: [`architecture.mmd`](architecture.mmd) (Mermaid). Edit that file and re-
 |---|---|---|
 | `frontend/` (Next.js 16) | Your machine, `npx next dev` on port 3000 | Search and listing pages. Server components call the API over `BACKEND_URL`; the browser never talks to FastAPI directly. The browser does load photos from `cdn.realtor.ca` and basemap tiles from OpenFreeMap for the 3D lot view. |
 | `backend` (FastAPI) | Docker, port 8000, source bind-mounted for reload | Listings API, City of Toronto data per listing, lot analysis, and zoning pathways (gap analysis against By-law 569-2013 plus the playbook in `backend/app/zoning/playbook/`). On start it runs `alembic upgrade head`, seeds an empty database from `backend/seed/*.json.gz`, and matches listings to city data if the `city` schema is loaded. |
-| `db` (Postgres 17 + PostGIS) | Docker, host port 5433, `pgdata` volume | `public` schema (owned by Alembic): `listings`, `listing_city_data`, `lot_analyses`. `city` schema (owned by the importer): parcels, zoning layers, address points, permits, heritage, Committee of Adjustment applications (`coa_raw` from the importer, `coa_applications` typed and geocoded by `app.city.coa`). |
+| `db` (Postgres 17 + PostGIS) | Docker, host port 5433, `pgdata` volume | `public` schema (owned by Alembic): `listings`, `listing_city_data`, `lot_analyses`, `listing_investment`, `zoning_answers`. `city` schema (owned by the importer): parcels, zoning layers, address points, permits, heritage, Committee of Adjustment applications (`coa_raw` from the importer, `coa_applications` typed and geocoded by `app.city.coa`). |
 | `importer` (GDAL) | Docker, `tools` profile, run on demand | Downloads Toronto Open Data packages into `data/city/` (cached by the city's `last_modified`) and loads them with `ogr2ogr` into the `city` schema. |
 
 ## External calls
@@ -20,6 +20,7 @@ Source: [`architecture.mmd`](architecture.mmd) (Mermaid). Edit that file and re-
 | From | To | When |
 |---|---|---|
 | backend | City of Toronto GIS (ArcGIS REST) | Lot analysis: 6 to 8 queries per lot for the parcel, neighbours, building footprints, zoning, lot coverage, sixplex permission and centrelines. Results are cached in `lot_analyses` for 30 days. `./start.sh lot-analysis` fills the cache for every Toronto listing. |
+| backend | Claude API (Anthropic SDK) | Optional, with `LLM_API_KEY`: 2 structured-output calls per new zoning question, to read the plan from plain words and to write the cited answer. Cached in `zoning_answers`. |
 | importer | Toronto Open Data (CKAN) | `./start.sh city-data`, then the backend runs `app.city.match` to link listings to addresses, lots and zoning, and `app.city.coa` to place Committee of Adjustment applications on address points. |
 | browser | `cdn.realtor.ca` | Listing photos through `next/image`. |
 | browser | OpenFreeMap | Vector tiles under the MapLibre 3D lot scene. |

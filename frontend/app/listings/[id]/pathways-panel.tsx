@@ -9,6 +9,9 @@ import {
   COST_LABELS,
   FACT_LABELS,
   TIME_LABELS,
+  type Answer,
+  type AskRequest,
+  type AskResponse,
   type CardPrecedents,
   type Candidate,
   type Gap,
@@ -54,11 +57,14 @@ const NUMBER_FIELDS: [keyof Numbers, string, string][] = [
 ];
 
 /**
- * "What could you build here?" A form for the proposal, then the zoning gaps and the
- * playbook pathways that address them. Deterministic: no model call. See docs/zoning-pathways.md.
+ * "What could you build here?" The plan in the person's own words, with the detail fields behind a
+ * toggle. The backend reads the text into the intent, runs the deterministic analysis, and writes a
+ * cited answer when a model key is configured. See docs/zoning-pathways.md.
  */
 export function PathwaysPanel({ id }: { id: string }) {
   const [mode, setMode] = useState<Mode>("buyer");
+  const [text, setText] = useState("");
+  const [showDetails, setShowDetails] = useState(false);
   const [project, setProject] = useState<Project>("unknown");
   const [walls, setWalls] = useState<Walls>("");
   const [numbers, setNumbers] = useState<Numbers>({
@@ -71,33 +77,40 @@ export function PathwaysPanel({ id }: { id: string }) {
     proposed_rear_setback_m: "",
     proposed_front_setback_m: "",
   });
-  const [result, setResult] = useState<PathwayAnalysis | null>(null);
+  const [result, setResult] = useState<AskResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    setBusy(true);
-    setError(null);
-    const intent: Intent = { mode, project };
-    if (walls) intent.keep_existing_walls = walls === "yes";
-    if (project === "sever") intent.sever_lot = true;
+    const plan = text.trim();
+    const details: Intent = { mode, project };
+    if (walls) details.keep_existing_walls = walls === "yes";
+    if (project === "sever") details.sever_lot = true;
+    let anyDetail = project !== "unknown" || walls !== "";
     for (const [key] of NUMBER_FIELDS) {
       const raw = numbers[key].trim();
       if (raw === "") continue;
       const value = Number(raw);
       if (!Number.isFinite(value) || value <= 0) {
         setError(`"${raw}" is not a valid number.`);
-        setBusy(false);
         return;
       }
-      intent[key] = key === "proposed_units" || key === "proposed_storeys" ? Math.round(value) : value;
+      details[key] = key === "proposed_units" || key === "proposed_storeys" ? Math.round(value) : value;
+      anyDetail = true;
     }
+    if (!plan && !anyDetail) {
+      setError("Write what you have in mind, or open the details and fill a field.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    const body: AskRequest = { mode, text: plan || null, details: anyDetail ? details : null };
     try {
-      const res = await fetch(`/api/listings/${encodeURIComponent(id)}/zoning/pathways`, {
+      const res = await fetch(`/api/listings/${encodeURIComponent(id)}/zoning/ask`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(intent),
+        body: JSON.stringify(body),
       });
       if (res.status === 404) {
         setError("No parcel data for this listing; the analysis covers Toronto lots only.");
@@ -105,7 +118,7 @@ export function PathwaysPanel({ id }: { id: string }) {
       } else if (!res.ok) {
         setError(`The analysis failed (${res.status}). Try again in a moment.`);
       } else {
-        setResult((await res.json()) as PathwayAnalysis);
+        setResult((await res.json()) as AskResponse);
       }
     } catch {
       setError("Could not reach the server.");
@@ -125,7 +138,7 @@ export function PathwaysPanel({ id }: { id: string }) {
       </div>
 
       <form onSubmit={submit} className="space-y-4 rounded-xl border border-border bg-surface p-5">
-        <div className="flex flex-wrap items-end gap-4">
+        <div className="flex flex-wrap items-end justify-between gap-4">
           <Field label="I am">
             <Segmented
               value={mode}
@@ -136,6 +149,29 @@ export function PathwaysPanel({ id }: { id: string }) {
               ]}
             />
           </Field>
+          <button
+            type="button"
+            onClick={() => setShowDetails((v) => !v)}
+            aria-expanded={showDetails}
+            className="rounded-lg border border-border px-3 py-1.5 text-sm text-muted hover:text-foreground"
+          >
+            {showDetails ? "Hide the details" : "Give the details"}
+          </button>
+        </div>
+        <label className="block space-y-1 text-sm">
+          <span className="text-muted">What do you have in mind?</span>
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            rows={3}
+            maxLength={2000}
+            placeholder="e.g. Keep the house and add a third storey, about 10.5 m high, and push the back wall out so the rear yard is 6.5 m."
+            className={`${control} resize-y leading-relaxed`}
+          />
+        </label>
+        {showDetails && (
+        <div className="space-y-4 border-t border-border pt-4">
+        <div className="flex flex-wrap items-end gap-4">
           <Field label="The plan">
             <select value={project} onChange={(e) => setProject(e.target.value as Project)} className={control}>
               {PROJECTS.map(([value, label]) => (
@@ -168,6 +204,9 @@ export function PathwaysPanel({ id }: { id: string }) {
             </Field>
           ))}
         </div>
+        <p className="text-xs text-muted">A detail you type here wins over what the text says.</p>
+        </div>
+        )}
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="submit"
@@ -176,13 +215,83 @@ export function PathwaysPanel({ id }: { id: string }) {
           >
             {busy ? "Checking the by-law…" : "Check the zoning"}
           </button>
-          <p className="text-xs text-muted">Leave a field blank when you do not know. The answer says what it needs.</p>
+          <p className="text-xs text-muted">Say what you know. The answer says what it still needs.</p>
         </div>
         {error && <p className="text-sm text-accent">{error}</p>}
       </form>
 
-      {result && <Results result={result} />}
+      {result && (
+        <>
+          <Understood result={result} />
+          {result.answer ? <WrittenAnswer answer={result.answer} /> : result.answer_note && (
+            <p className="rounded-lg bg-background p-3 text-xs leading-relaxed text-muted">{result.answer_note}</p>
+          )}
+          <Results result={result.analysis} />
+        </>
+      )}
     </section>
+  );
+}
+
+/** What the model read from the text, so the person can correct it in the details. */
+function Understood({ result }: { result: AskResponse }) {
+  if (result.understood.length === 0 && result.unclear.length === 0) return null;
+  return (
+    <div className="space-y-1 text-sm">
+      {result.understood.length > 0 && (
+        <p>
+          <span className="text-muted">Understood: </span>
+          {result.understood.join(" · ")}
+        </p>
+      )}
+      {result.unclear.length > 0 && (
+        <p className="text-muted">Not used: {result.unclear.join(" · ")}</p>
+      )}
+    </div>
+  );
+}
+
+const CITATION_LABELS: Record<string, string> = { card: "route", clause: "by-law", gap: "standard", file: "file" };
+
+function Citation({ id }: { id: string }) {
+  const [kind, ...rest] = id.split(":");
+  const value = rest.join(":");
+  const label = CITATION_LABELS[kind] ?? kind;
+  return (
+    <span className="mr-1 inline-block rounded bg-border px-1.5 py-0.5 font-mono text-[10px] text-muted" title={id}>
+      {label} {value.replace(/-/g, " ")}
+    </span>
+  );
+}
+
+/** The model's written answer. Every paragraph passed the citation check on the server. */
+function WrittenAnswer({ answer }: { answer: Answer }) {
+  return (
+    <div className="space-y-4 rounded-xl border border-border bg-surface p-5">
+      <p className="text-base font-medium leading-snug">{answer.headline}</p>
+      {answer.sections.map((section) => (
+        <div key={section.heading} className="space-y-2">
+          <h3 className="text-sm font-semibold">{section.heading}</h3>
+          {section.paragraphs.map((p, i) => (
+            <div key={i} className="space-y-1">
+              <p className="text-sm leading-relaxed text-foreground/90">{p.text}</p>
+              <p className="leading-5">
+                {p.citations.map((c) => (
+                  <Citation key={c} id={c} />
+                ))}
+              </p>
+            </div>
+          ))}
+        </div>
+      ))}
+      {answer.unknowns.length > 0 && <List title="Still unknown" items={answer.unknowns} />}
+      {answer.questions.length > 0 && <List title="Ask next" items={answer.questions} />}
+      <p className="text-xs text-muted">
+        Written by {answer.model} from the analysis below. Every paragraph cites a route, a by-law clause, a standard or a
+        nearby file; paragraphs that cited nothing in the analysis were removed
+        {answer.dropped.length > 0 && ` (${answer.dropped.length} removed)`}.
+      </p>
+    </div>
   );
 }
 

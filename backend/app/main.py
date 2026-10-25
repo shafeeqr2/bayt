@@ -32,6 +32,7 @@ from app.strategy import estimate as strategy_estimate
 from app.strategy import parse as strategy_parse
 from app.strategy import search as strategy
 from app.strategy.finance import Financing
+from app.zoning import answer as zoning_answer
 from app.zoning import cards as zoning_cards
 from app.zoning import precedents as zoning_precedents
 from app.zoning import service as zoning_service
@@ -364,6 +365,23 @@ def post_point_pathways(
     try:
         return zoning_service.pathways_for_point(session, lat, lon, intent)
     except (lot_service.NotInCoverage, lot_service.GISError) as exc:
+        raise _lot_errors(exc) from exc
+
+
+@app.post("/api/listings/{listing_id}/zoning/ask")
+def post_listing_ask(listing_id: str, req: zoning_answer.AskRequest, session: SessionDep) -> zoning_answer.AskResponse:
+    """The plan in plain words (and/or detail fields) -> the deterministic analysis -> a cited written answer.
+
+    The model reads the text into the intent fields and writes the answer from the analysis
+    alone; every paragraph must cite a card, clause, gap or nearby file in it, or it is dropped.
+    Without LLM_API_KEY the response carries the analysis and `answer` is null.
+    """
+    listing = session.get(Listing, listing_id)
+    if listing is None:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    try:
+        return zoning_service.ask_for_listing(session, listing, req)
+    except (lot_service.NotInCoverage, lot_service.ListingNotLocated, lot_service.GISError) as exc:
         raise _lot_errors(exc) from exc
 
 

@@ -190,3 +190,33 @@ export const FACT_LABELS: Record<string, string> = {
   "intent.proposed_gfa_m2": "the proposed floor area",
   "heritage.listed": "the heritage register status",
 };
+
+/** A paragraph of the written answer and the ids it rests on (card:, clause:, gap:, file:). */
+export type AnswerParagraph = { text: string; citations: string[] };
+export type AnswerSection = { heading: string; paragraphs: AnswerParagraph[] };
+
+export type Answer = {
+  headline: string;
+  sections: AnswerSection[];
+  questions: string[];
+  unknowns: string[];
+  dropped: string[];
+  model: string;
+  prompt_version: number;
+};
+
+export type AskRequest = {
+  mode: Mode;
+  text?: string | null;
+  details?: Intent | null;
+};
+
+export type AskResponse = {
+  intent: Intent;
+  understood: string[];
+  unclear: string[];
+  analysis: PathwayAnalysis;
+  answer: Answer | null;
+  answer_note: string | null;
+  cached: boolean;
+};

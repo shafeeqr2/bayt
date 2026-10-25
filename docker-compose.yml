@@ -23,6 +23,9 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://bayt:bayt@db:5432/bayt
       CORS_ORIGINS: '["http://localhost:${FRONTEND_PORT:-3000}"]'
+      # Optional: lets the zoning answer read free text and write a cited summary.
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      ZONING_MODEL: ${ZONING_MODEL:-claude-opus-5-5}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:

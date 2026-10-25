@@ -5,7 +5,8 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 
 from app.lot import service as lot_service
-from app.models import Listing, ListingCityData
+from app.models import Listing, ListingCityData, ZoningAnswer
+from app.zoning import answer as model_answer
 from app.zoning import precedents
 from app.zoning.intent import Intent
 from app.zoning.pathways import analyze_pathways
@@ -67,4 +68,71 @@ def precedents_for_point(
         summary=precedents.summarize(items),
         items=items,
         truncated=len(items) >= precedents.MAX_ITEMS,
+    )
+
+
+def ask_for_listing(session: Session, listing: Listing, req: model_answer.AskRequest) -> model_answer.AskResponse:
+    """Free text and/or detail fields -> intent -> deterministic analysis -> cited written answer.
+
+    The model is optional: without credentials the response carries the analysis and
+    a note. The written answer is cached per listing, intent, playbook, prompt and model.
+    """
+    client = model_answer.make_client()
+    details = req.details or Intent()
+    details.mode = req.mode
+    text = (req.text or "").strip() or None
+    understood: list[str] = []
+    unclear: list[str] = []
+    notes: list[str] = []
+
+    parsed_intent: Intent | None = None
+    if text:
+        try:
+            parsed, parsed_intent = model_answer.parse_intent(client, text, req.mode)
+            understood, unclear = parsed.understood, parsed.unclear
+        except model_answer.ModelUnavailable as exc:
+            notes.append(f"The text was not read ({exc}); only the detail fields were used.")
+    intent = model_answer.merge_intent(parsed_intent, details, text)
+
+    analysis = pathways_for_listing(session, listing, intent)
+
+    key = model_answer.request_hash(intent, analysis.playbook_version)
+    cached = session.get(ZoningAnswer, (listing.id, key))
+    if cached is not None:
+        answer = model_answer.Answer(**cached.answer) if cached.answer else None
+        if cached.note:
+            notes.append(cached.note)
+        return model_answer.AskResponse(
+            intent=intent, understood=understood, unclear=unclear, analysis=analysis, answer=answer,
+            answer_note=" ".join(notes) or None, cached=True,
+        )
+
+    answer = None
+    note = None
+    try:
+        answer = model_answer.write_answer(client, analysis)
+        if not answer.sections:
+            note = "The model's answer had no paragraph with a valid citation, so none is shown."
+            answer = None
+    except model_answer.ModelUnavailable as exc:
+        note = f"No written answer: {exc}."
+    if client is not None:
+        # Cache a model result (or a model failure to cite), never a missing key.
+        session.merge(
+            ZoningAnswer(
+                listing_id=listing.id,
+                request_hash=key,
+                model=model_answer.settings.zoning_model,
+                prompt_version=model_answer.PROMPT_VERSION,
+                intent=intent.model_dump(mode="json"),
+                answer=answer.model_dump(mode="json") if answer else None,
+                note=note,
+            )
+        )
+        session.commit()
+    if note:
+        notes.append(note)
+    return model_answer.AskResponse(
+        intent=intent, understood=understood, unclear=unclear, analysis=analysis, answer=answer,
+        answer_note=" ".join(notes) or None, cached=False,
     )

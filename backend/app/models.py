@@ -171,3 +171,27 @@ class LotAnalysisCache(Base):
     computed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+
+class ZoningAnswer(Base):
+    """A model-written zoning answer for one listing and one intent (phase 2 cache).
+
+    Keyed by `request_hash` (intent, playbook version, prompt version, model), so
+    the same question costs one model call. `answer` is `app.zoning.answer.Answer`;
+    null when the model gave nothing usable, with the reason in `note`.
+    """
+
+    __tablename__ = "zoning_answers"
+
+    listing_id: Mapped[str] = mapped_column(
+        String(32), ForeignKey("listings.id", ondelete="CASCADE"), primary_key=True
+    )
+    request_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    model: Mapped[str] = mapped_column(Text)
+    prompt_version: Mapped[int] = mapped_column(Integer)
+    intent: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    answer: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    note: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )

@@ -200,7 +200,12 @@ curl -X POST http://localhost:8000/api/listings/30403339/zoning/pathways \
   -d '{"mode": "buyer", "keep_existing_walls": true, "proposed_rear_setback_m": 8.0, "proposed_storeys": 2}'
 curl http://localhost:8000/api/zoning/playbook   # every playbook card with its trigger and legal basis
 curl "http://localhost:8000/api/listings/30403339/zoning/precedents?radius_m=500"   # nearby Committee of Adjustment files
+curl -X POST http://localhost:8000/api/listings/30403339/zoning/ask \
+  -H 'content-type: application/json' \
+  -d '{"mode": "buyer", "text": "Keep the house and add a third storey about 10.5 m high"}'
 ```
+
+With `LLM_API_KEY` in `.env`, the `ask` endpoint (and the form) reads the plan from plain words and writes a short answer in which every paragraph cites a route, a by-law clause, a standard or a nearby file from the analysis; paragraphs that cite nothing in it are dropped. Without the key the form still works on the detail fields and shows the deterministic result.
 
 Once `./start.sh city-data` has loaded the Committee of Adjustment open data (every minor variance and consent application since 2001, placed on the city's address points), the answer also shows what the committee decided on comparable files near the lot, and the listing page lists the nearest decisions. The open data has the decision and the description, not the variance table.
 

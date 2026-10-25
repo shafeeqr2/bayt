@@ -183,3 +183,45 @@ is unknown, the zone label may differ, and the by-law changed in 2013 and again
 with the multiplex permissions in 2023. The answer says so in its caveats. A
 later phase can enrich recent files with the hearing notice from the
 Application Information Centre while it is still online.
+
+## Phase 2: free text in, a cited answer out
+
+`app/zoning/answer.py` makes 2 structured-output calls to Claude through the
+official SDK (`anthropic`, `client.messages.parse`). The model is
+`ZONING_MODEL` (default `claude-opus-5-5`); the key is `LLM_API_KEY`.
+Without a key both calls raise `ModelUnavailable` and the endpoint returns the
+deterministic analysis with a note. Nothing else changes.
+
+1. `parse_intent`: the person's words -> `ParsedIntent`, the same fields as
+   `Intent` plus `understood` (one line per fact read) and `unclear` (what no
+   field holds). The model fills a field only when the text says it. A number
+   that fails `Intent`'s bounds (a negative height) is dropped. Effort `low`.
+2. `merge_intent`: detail fields from the form win; the model fills the blanks.
+3. The deterministic pipeline runs on the merged intent, exactly as in phase 1.
+4. `write_answer`: `_compact_analysis` gives the model the gaps, the ranked cards
+   with their legal basis, risks and questions, and the nearby files, each with
+   an id (`gap:<standard>`, `card:<id>`, `clause:<clause>`, `file:<reference>`).
+   The model returns a `Draft`: headline, sections of paragraphs with citations,
+   questions, unknowns. Effort `medium`.
+5. `check_citations` keeps a paragraph only when every citation resolves to an
+   id in the analysis. A paragraph with no citation, a made-up clause or an
+   unknown file is dropped and listed in `Answer.dropped`. An answer with no
+   paragraph left is reported as unavailable. The model never adds a rule, a
+   number or a file; it can only word what the analysis holds.
+
+```
+POST /api/listings/{id}/zoning/ask   body: AskRequest {mode, text?, details?: Intent}
+                                     -> AskResponse {intent, understood, unclear, analysis, answer?, answer_note, cached}
+```
+
+Answers are cached in `zoning_answers` by listing and `request_hash` (intent
+fields without the text, playbook version, `PROMPT_VERSION`, model). The text
+itself is not part of the key, so 2 wordings of the same plan cost 1 model call.
+Bump `PROMPT_VERSION` when a prompt or an output schema changes.
+
+The form on the listing page takes the text first. "Give the details" opens the
+structured fields; a detail typed there wins over the text. The written answer
+sits above the gap table, each paragraph with its citation chips, and says how
+many paragraphs the check removed.
+
+Tests use a fake client (`tests/test_zoning_answer.py`); no test calls the API.
