@@ -1,6 +1,6 @@
 """Phase 2: the model reads free text into the intent, and writes a cited answer from the analysis.
 
-Two calls to Claude, both with structured output so the shape is fixed:
+Two model calls, both with structured (JSON schema) output so the shape is fixed:
 
 1. `parse_intent`: the buyer's own words -> the fields of `Intent`. The model may
    only fill fields the text supports; a number it did not read stays None.
@@ -11,8 +11,11 @@ Two calls to Claude, both with structured output so the shape is fixed:
    `check_citations` drops every paragraph whose citations do not all resolve to
    something in the analysis. The model never adds a rule, a number or a file.
 
-Without credentials (`LLM_API_KEY`), both calls raise `ModelUnavailable`
-and the endpoint returns the deterministic analysis alone.
+The provider comes from the key (`LLM_API_KEY`): an Anthropic key uses the
+Anthropic SDK; an OpenRouter or NVIDIA key uses the OpenAI-style chat API with
+`response_format` json_schema, which is how NVIDIA's Nemotron models are
+served. Without credentials both calls raise `ModelUnavailable` and the
+endpoint returns the deterministic analysis alone.
 """
 
 from __future__ import annotations
@@ -20,11 +23,14 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from dataclasses import dataclass
 from typing import Any, Protocol
 
+import httpx
 from pydantic import BaseModel, Field, ValidationError
 
 from app.config import settings
+from app.zoning import textrules
 from app.zoning.intent import Intent, Mode
 from app.zoning.schemas import PathwayAnalysis
 
@@ -57,16 +63,16 @@ class ParsedIntent(BaseModel):
     project: str | None = Field(None, description="addition | new_build | convert | garden_suite | laneway_suite | sever | null")
     keep_existing_walls: bool | None = Field(None, description="true when the main walls stay (alteration), false for a tear-down")
     sever_lot: bool | None = None
-    proposed_units: int | None = None
-    proposed_storeys: int | None = None
-    proposed_height_m: float | None = None
-    proposed_gfa_m2: float | None = Field(None, description="Gross floor area of all floors in square metres")
-    proposed_footprint_m2: float | None = None
-    proposed_building_depth_m: float | None = None
-    proposed_building_length_m: float | None = None
-    proposed_front_setback_m: float | None = None
-    proposed_side_setback_m: float | None = Field(None, description="The smaller side yard in metres")
-    proposed_rear_setback_m: float | None = None
+    proposed_units: int | None = Field(None, description="Dwelling units after the work")
+    proposed_storeys: int | None = Field(None, description="Storeys after the work (a 'third storey' means 3)")
+    proposed_height_m: float | None = Field(None, description="Building height after the work, metres")
+    proposed_gfa_m2: float | None = Field(None, description="Gross floor area of all floors, square metres")
+    proposed_footprint_m2: float | None = Field(None, description="Ground area of all buildings after the work, square metres")
+    proposed_building_depth_m: float | None = Field(None, description="Rear main wall measured from the required front yard setback, metres")
+    proposed_building_length_m: float | None = Field(None, description="Front main wall to rear main wall, metres")
+    proposed_front_setback_m: float | None = Field(None, description="Front wall to the front lot line, metres")
+    proposed_side_setback_m: float | None = Field(None, description="The smaller side yard, metres")
+    proposed_rear_setback_m: float | None = Field(None, description="Rear wall to the rear lot line, metres")
     understood: list[str] = Field(default_factory=list, description="One short line per fact read from the text, in the person's units")
     unclear: list[str] = Field(default_factory=list, description="Things the text mentions that no field can hold")
 
@@ -82,7 +88,7 @@ class Section(BaseModel):
 
 
 class Draft(BaseModel):
-    headline: str = Field(description="One sentence: can the plan go ahead, and by which route")
+    headline: str = Field(description="One sentence about this plan: what it is short on and the route that fits, e.g. 'The third storey is 0.5 m over the height limit; a minor variance is the usual route.'")
     sections: list[Section]
     questions: list[str] = Field(description="Buyer mode: for the lawyer, agent or builder. Professional mode: what to check next")
     unknowns: list[str] = Field(description="Facts the analysis lacked, in plain words")
@@ -98,55 +104,175 @@ class Answer(BaseModel):
     prompt_version: int = PROMPT_VERSION
 
 
-# -- client -------------------------------------------------------------------
+# -- backends ----------------------------------------------------------------
 
 
-class ParseClient(Protocol):
-    """The slice of `anthropic.Anthropic` this module uses, so tests can pass a fake."""
+class Backend(Protocol):
+    """One structured call: system + user prompt -> an instance of `schema`."""
 
-    @property
-    def messages(self) -> Any: ...
+    model: str
+
+    def structured(self, *, system: str, user: str, schema: type[BaseModel], effort: str, max_tokens: int) -> BaseModel: ...
 
 
-def make_client() -> ParseClient | None:
-    """A real client when credentials exist, else None."""
-    if not settings.llm_api_key:
+@dataclass(frozen=True)
+class Provider:
+    name: str
+    kind: str  # anthropic | openai
+    base_url: str | None
+    default_model: str
+
+
+PROVIDERS = {
+    "anthropic": Provider("anthropic", "anthropic", None, "claude-opus-5-5"),
+    "openrouter": Provider("openrouter", "openai", "https://openrouter.ai/api/v1", "nvidia/nemotron-3-super-120b-a12b"),
+    "nvidia": Provider("nvidia", "openai", "https://integrate.api.nvidia.com/v1", "nvidia/nemotron-3-super-120b-a12b"),
+    "openai": Provider("openai", "openai", None, ""),
+}
+KEY_PREFIXES = (("sk-ant-", "anthropic"), ("sk-or-", "openrouter"), ("nvapi-", "nvidia"))
+
+
+def resolve_provider(key: str | None = None, provider: str | None = None) -> Provider | None:
+    """The provider for the configured key, or None without a key or an unknown prefix."""
+    key = key if key is not None else settings.llm_api_key
+    name = (provider or settings.llm_provider or "auto").lower()
+    if not key:
         return None
-    import anthropic
+    if name == "auto":
+        name = next((p for prefix, p in KEY_PREFIXES if key.startswith(prefix)), "")
+    if name not in PROVIDERS:
+        return None
+    p = PROVIDERS[name]
+    base = settings.llm_base_url or p.base_url
+    return Provider(p.name, p.kind, base, p.default_model)
 
-    return anthropic.Anthropic(api_key=settings.llm_api_key)
+
+def model_name(provider: Provider | None = None) -> str:
+    p = provider or resolve_provider()
+    return settings.zoning_model or (p.default_model if p else "")
 
 
-def _call(client: ParseClient | None, *, system: str, user: str, output_format: type[BaseModel], effort: str, max_tokens: int) -> BaseModel:
+def make_client() -> Backend | None:
+    """A backend when credentials exist, else None."""
+    p = resolve_provider()
+    if p is None:
+        return None
+    model = model_name(p)
+    if p.kind == "anthropic":
+        return AnthropicBackend(settings.llm_api_key or "", model)
+    if not p.base_url or not model:
+        return None
+    return OpenAIBackend(settings.llm_api_key or "", p.base_url, model, p.name)
+
+
+class AnthropicBackend:
+    """`client.messages.parse` with `output_format`: the SDK validates the JSON against the schema."""
+
+    def __init__(self, api_key: str, model: str, client: Any = None):
+        self.model = model
+        self._client = client
+        self._api_key = api_key
+
+    def structured(self, *, system: str, user: str, schema: type[BaseModel], effort: str, max_tokens: int) -> BaseModel:
+        import anthropic
+
+        if self._client is None:
+            self._client = anthropic.Anthropic(api_key=self._api_key)
+        try:
+            response = self._client.messages.parse(
+                model=self.model,
+                max_tokens=max_tokens,
+                system=system,
+                messages=[{"role": "user", "content": user}],
+                output_format=schema,
+                output_config={"effort": effort},
+            )
+        except anthropic.AuthenticationError as exc:
+            raise ModelUnavailable("the API key was rejected") from exc
+        except anthropic.RateLimitError as exc:
+            raise ModelUnavailable("the model is rate limited; try again in a minute") from exc
+        except (anthropic.APIStatusError, anthropic.APIConnectionError) as exc:
+            raise ModelUnavailable(f"the model call failed: {exc.__class__.__name__}") from exc
+        if getattr(response, "stop_reason", None) == "refusal":
+            raise ModelUnavailable("the model declined the request")
+        parsed = getattr(response, "parsed_output", None)
+        if parsed is None:
+            raise ModelUnavailable("the model returned no structured output")
+        return parsed
+
+
+_FENCE = re.compile(r"^\s*```(?:json)?\s*|\s*```\s*$", re.S)
+
+
+class OpenAIBackend:
+    """OpenAI-style `POST {base_url}/chat/completions` with `response_format` json_schema.
+
+    This is how OpenRouter and NVIDIA NIM serve the Nemotron models. The JSON comes
+    back as the message text; it is validated with the pydantic schema here, so a
+    provider that ignores the schema still cannot slip a wrong shape through.
+    """
+
+    def __init__(self, api_key: str, base_url: str, model: str, provider: str = "openai", transport: httpx.BaseTransport | None = None):
+        self.model = model
+        self.provider = provider
+        self._url = base_url.rstrip("/") + "/chat/completions"
+        headers = {"authorization": f"Bearer {api_key}", "content-type": "application/json"}
+        if provider == "openrouter":
+            headers["x-title"] = "Bayt zoning pathways"
+        self._http = httpx.Client(headers=headers, timeout=180.0, transport=transport)
+
+    def structured(self, *, system: str, user: str, schema: type[BaseModel], effort: str, max_tokens: int) -> BaseModel:
+        body = {
+            "model": self.model,
+            "max_tokens": max_tokens,
+            "temperature": 0,
+            "messages": [
+                {"role": "system", "content": system + "\n\nAnswer with one JSON object that matches the given schema. No prose outside the JSON."},
+                {"role": "user", "content": user},
+            ],
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {"name": schema.__name__, "strict": True, "schema": schema.model_json_schema()},
+            },
+        }
+        if self.provider == "openrouter":
+            # Reasoning models think inside the output budget and Nemotron thinks for minutes
+            # when allowed; both calls here are "write JSON from given material", so thinking is
+            # off unless the caller asks for high effort.
+            body["reasoning"] = {"effort": "low", "exclude": True} if effort in ("high", "xhigh", "max") else {"enabled": False}
+        try:
+            response = self._http.post(self._url, json=body)
+        except httpx.HTTPError as exc:
+            raise ModelUnavailable(f"the model call failed: {exc.__class__.__name__}") from exc
+        if response.status_code in (401, 403):
+            raise ModelUnavailable("the API key was rejected")
+        if response.status_code == 429:
+            raise ModelUnavailable("the model is rate limited; try again in a minute")
+        if response.status_code >= 400:
+            raise ModelUnavailable(f"the model call failed: HTTP {response.status_code} {response.text[:120]}")
+        try:
+            data = response.json()
+            choice = data["choices"][0]
+            text = choice["message"]["content"]
+        except (ValueError, KeyError, IndexError, TypeError) as exc:
+            raise ModelUnavailable("the model returned no structured output") from exc
+        if choice.get("finish_reason") == "length":
+            usage = data.get("usage") or {}
+            raise ModelUnavailable(
+                f"the model ran out of output tokens ({usage.get('completion_tokens', '?')} used of {max_tokens})"
+            )
+        if not isinstance(text, str) or not text.strip():
+            raise ModelUnavailable("the model returned no structured output")
+        try:
+            return schema.model_validate_json(_FENCE.sub("", text).strip())
+        except ValidationError as exc:
+            raise ModelUnavailable(f"the model returned JSON that does not fit the schema ({exc.error_count()} errors)") from exc
+
+
+def _call(client: Backend | None, *, system: str, user: str, output_format: type[BaseModel], effort: str, max_tokens: int) -> BaseModel:
     if client is None:
         raise ModelUnavailable("LLM_API_KEY is not set")
-    try:
-        import anthropic
-    except ImportError:  # pragma: no cover - the fake client in tests needs no SDK
-        anthropic = None
-    try:
-        response = client.messages.parse(
-            model=settings.zoning_model,
-            max_tokens=max_tokens,
-            system=system,
-            messages=[{"role": "user", "content": user}],
-            output_format=output_format,
-            output_config={"effort": effort},
-        )
-    except Exception as exc:  # noqa: BLE001 - mapped to one failure the endpoint reports
-        if anthropic is not None and isinstance(exc, anthropic.AuthenticationError):
-            raise ModelUnavailable("the API key was rejected") from exc
-        if anthropic is not None and isinstance(exc, anthropic.RateLimitError):
-            raise ModelUnavailable("the model is rate limited; try again in a minute") from exc
-        if anthropic is not None and isinstance(exc, (anthropic.APIStatusError, anthropic.APIConnectionError)):
-            raise ModelUnavailable(f"the model call failed: {exc.__class__.__name__}") from exc
-        raise
-    if getattr(response, "stop_reason", None) == "refusal":
-        raise ModelUnavailable("the model declined the request")
-    parsed = getattr(response, "parsed_output", None)
-    if parsed is None:
-        raise ModelUnavailable("the model returned no structured output")
-    return parsed
+    return client.structured(system=system, user=user, schema=output_format, effort=effort, max_tokens=max_tokens)
 
 
 # -- 1. free text -> intent ---------------------------------------------------
@@ -161,22 +287,86 @@ Rules:
 - "Split the lot", "sever", "two lots" imply sever_lot = true and project = sever.
 - More units inside the house with no addition is project = convert.
 - A garden suite or a laneway suite is its own project value.
-- `understood` lists each fact you took from the text, one short line each. `unclear` lists what the text says that no field holds.
+- `understood` lists each fact you took from the text, one short line each, as `field = value`.
+- `unclear` lists only things the text says that no field can hold. Do not list fields the text never mentions.
 - Never invent a number."""
 
 
-def parse_intent(client: ParseClient | None, text: str, mode: Mode) -> tuple[ParsedIntent, Intent]:
+FIELD_GUIDE = "\n".join(
+    f"- {name}: {field.description or name.replace('proposed_', '').replace('_', ' ')}"
+    for name, field in ParsedIntent.model_fields.items()
+    if name not in ("understood", "unclear")
+)
+
+
+def parse_intent(client: Backend | None, text: str, mode: Mode) -> tuple[ParsedIntent, Intent]:
     """The model's reading of `text`, and the Intent built from it (invalid numbers dropped)."""
     parsed = _call(
         client,
         system=PARSE_SYSTEM,
-        user=f"Mode: {mode}.\n\nThe person wrote:\n\"\"\"\n{text.strip()}\n\"\"\"",
+        user=(
+            f"Mode: {mode}.\n\nThe person wrote:\n\"\"\"\n{text.strip()}\n\"\"\"\n\n"
+            f"Fields to fill (a number goes in its field, not only in `understood`):\n{FIELD_GUIDE}"
+        ),
         output_format=ParsedIntent,
         effort="low",
         max_tokens=2000,
     )
     assert isinstance(parsed, ParsedIntent)
-    return parsed, intent_from_parsed(parsed, text, mode)
+    backfill_from_understood(parsed)
+    backfill_from_rules(parsed, text)
+    intent = intent_from_parsed(parsed, text, mode)
+    # The lines a person checks come from the final fields, not from the model's prose.
+    parsed.understood = textrules.describe(intent.model_dump())
+    parsed.unclear = [u for u in parsed.unclear if not _names_an_empty_field(u)]
+    return parsed, intent
+
+
+_FIELD_NAME = re.compile(r"\b(proposed_[a-z0-9_]+|keep_existing_walls|sever_lot)\b")
+
+
+def _names_an_empty_field(line: str) -> bool:
+    """Smaller models list every blank field as "unclear"; a line that names a field and gives no number is noise."""
+    return bool(_FIELD_NAME.search(line)) and not re.search(r"\d", _FIELD_NAME.sub("", line))
+
+
+def backfill_from_rules(parsed: ParsedIntent, text: str) -> None:
+    """Fields the model left empty take the rule-based reading of the same text (`textrules.extract`)."""
+    for name, value in textrules.extract(text).items():
+        if name in ParsedIntent.model_fields and getattr(parsed, name) is None:
+            setattr(parsed, name, value)
+
+
+def rules_intent(text: str, mode: Mode) -> tuple[ParsedIntent, Intent]:
+    """The no-model path: the same reading from rules alone."""
+    parsed = ParsedIntent(**textrules.extract(text))
+    intent = intent_from_parsed(parsed, text, mode)
+    parsed.understood = textrules.describe(intent.model_dump())
+    return parsed, intent
+
+
+_ASSIGNMENT = re.compile(r"\b(proposed_[a-z0-9_]+|keep_existing_walls|sever_lot|project)\s*=\s*([A-Za-z0-9_.\-]+)")
+
+
+def backfill_from_understood(parsed: ParsedIntent) -> None:
+    """A smaller model sometimes writes `proposed_rear_setback_m = 6.5` in `understood` and leaves the field null.
+
+    The line is the model's own reading, so an empty field takes that value. A filled field is never changed.
+    """
+    for line in parsed.understood:
+        for name, raw in _ASSIGNMENT.findall(line):
+            if name not in ParsedIntent.model_fields or getattr(parsed, name) is not None:
+                continue
+            value: Any = raw
+            if name in ("keep_existing_walls", "sever_lot"):
+                value = {"true": True, "false": False}.get(raw.lower())
+            elif name.startswith("proposed_"):
+                try:
+                    value = int(raw) if name in ("proposed_units", "proposed_storeys") else float(raw)
+                except ValueError:
+                    continue
+            if value is not None:
+                setattr(parsed, name, value)
 
 
 def intent_from_parsed(parsed: ParsedIntent, text: str, mode: Mode) -> Intent:
@@ -347,17 +537,17 @@ def check_citations(draft: Draft, a: PathwayAnalysis, model: str) -> Answer:
     )
 
 
-def write_answer(client: ParseClient | None, analysis: PathwayAnalysis) -> Answer:
+def write_answer(client: Backend | None, analysis: PathwayAnalysis) -> Answer:
     draft = _call(
         client,
         system=WRITE_SYSTEM,
         user=json.dumps(_compact_analysis(analysis), default=str, sort_keys=True),
         output_format=Draft,
         effort="medium",
-        max_tokens=6000,
+        max_tokens=12000,
     )
     assert isinstance(draft, Draft)
-    return check_citations(draft, analysis, settings.zoning_model)
+    return check_citations(draft, analysis, client.model if client else model_name())
 
 
 class AskRequest(BaseModel):
@@ -381,7 +571,7 @@ class AskResponse(BaseModel):
 def request_hash(intent: Intent, playbook_version: str) -> str:
     """Cache key: the same intent, playbook, prompt and model give the same answer."""
     payload = json.dumps(
-        {"intent": intent.model_dump(exclude={"text"}), "playbook": playbook_version, "prompt": PROMPT_VERSION, "model": settings.zoning_model},
+        {"intent": intent.model_dump(exclude={"text"}), "playbook": playbook_version, "prompt": PROMPT_VERSION, "model": model_name()},
         sort_keys=True,
     )
     return hashlib.sha256(payload.encode()).hexdigest()

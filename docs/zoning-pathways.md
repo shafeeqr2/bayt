@@ -186,16 +186,40 @@ Application Information Centre while it is still online.
 
 ## Phase 2: free text in, a cited answer out
 
-`app/zoning/answer.py` makes 2 structured-output calls to Claude through the
-official SDK (`anthropic`, `client.messages.parse`). The model is
-`ZONING_MODEL` (default `claude-opus-5-5`); the key is `LLM_API_KEY`.
+`app/zoning/answer.py` makes 2 structured-output (JSON schema) calls through
+one of 2 backends, picked from the key in `LLM_API_KEY`:
+
+| Key prefix | Provider | Backend | Default `ZONING_MODEL` |
+|---|---|---|---|
+| `sk-ant-` | Anthropic | `AnthropicBackend`: the official SDK, `client.messages.parse` | `claude-opus-5-5` |
+| `sk-or-` | OpenRouter | `OpenAIBackend`: OpenAI-style `chat/completions` with `response_format` json_schema | `nvidia/nemotron-3-super-120b-a12b` |
+| `nvapi-` | NVIDIA NIM (build.nvidia.com) | `OpenAIBackend` | `nvidia/nemotron-3-super-120b-a12b` |
+| other | any OpenAI-style endpoint | `OpenAIBackend`, with `LLM_PROVIDER=openai` and `LLM_BASE_URL` | none; set `ZONING_MODEL` |
+
+The OpenAI backend validates the reply against the pydantic schema itself, so a
+provider that ignores the schema still cannot slip a wrong shape through. On
+OpenRouter it turns the model's hidden reasoning off for the parse and down to
+"low" for the answer; Nemotron otherwise spends the whole output budget thinking.
 Without a key both calls raise `ModelUnavailable` and the endpoint returns the
 deterministic analysis with a note. Nothing else changes.
 
+Measured on 2026-10-24 with `nvidia/nemotron-3-super-120b-a12b` on OpenRouter:
+the parse plus the answer took about 80 s and cost well under 1 cent. A smaller
+model sometimes writes `proposed_rear_setback_m = 6.5` in its `understood` notes
+and leaves the field null; `backfill_from_understood` takes such a line for an
+empty field.
+
 1. `parse_intent`: the person's words -> `ParsedIntent`, the same fields as
-   `Intent` plus `understood` (one line per fact read) and `unclear` (what no
-   field holds). The model fills a field only when the text says it. A number
-   that fails `Intent`'s bounds (a negative height) is dropped. Effort `low`.
+   `Intent` plus `understood` and `unclear` (what no field holds). The model
+   fills a field only when the text says it. A number that fails `Intent`'s
+   bounds (a negative height) is dropped. Effort `low`. Under the model sits
+   `app/zoning/textrules.py`, a rule-based reader of the common phrases
+   ("third storey", "10.5 m high", "rear yard of 6.5 m", "tear it down",
+   "fourplex", feet and square feet converted): it fills any field the model
+   left empty, and it is the only reader when no key is set. The `understood`
+   lines shown to the person are built from the final fields
+   (`textrules.describe`), not from the model's prose, so they are the same
+   facts the analysis used.
 2. `merge_intent`: detail fields from the form win; the model fills the blanks.
 3. The deterministic pipeline runs on the merged intent, exactly as in phase 1.
 4. `write_answer`: `_compact_analysis` gives the model the gaps, the ranked cards

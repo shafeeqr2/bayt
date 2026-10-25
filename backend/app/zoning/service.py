@@ -91,7 +91,10 @@ def ask_for_listing(session: Session, listing: Listing, req: model_answer.AskReq
             parsed, parsed_intent = model_answer.parse_intent(client, text, req.mode)
             understood, unclear = parsed.understood, parsed.unclear
         except model_answer.ModelUnavailable as exc:
-            notes.append(f"The text was not read ({exc}); only the detail fields were used.")
+            # No model: the rule-based reader still takes the common phrases.
+            parsed, parsed_intent = model_answer.rules_intent(text, req.mode)
+            understood = parsed.understood
+            notes.append(f"The text was read by rules only ({exc}); check the understood line and use the details for the rest.")
     intent = model_answer.merge_intent(parsed_intent, details, text)
 
     analysis = pathways_for_listing(session, listing, intent)
@@ -116,17 +119,17 @@ def ask_for_listing(session: Session, listing: Listing, req: model_answer.AskReq
             answer = None
     except model_answer.ModelUnavailable as exc:
         note = f"No written answer: {exc}."
-    if client is not None:
-        # Cache a model result (or a model failure to cite), never a missing key.
+    if answer is not None:
+        # Only a usable answer is cached; a failure (rate limit, token limit, no citations) is retried next time.
         session.merge(
             ZoningAnswer(
                 listing_id=listing.id,
                 request_hash=key,
-                model=model_answer.settings.zoning_model,
+                model=model_answer.model_name(),
                 prompt_version=model_answer.PROMPT_VERSION,
                 intent=intent.model_dump(mode="json"),
-                answer=answer.model_dump(mode="json") if answer else None,
-                note=note,
+                answer=answer.model_dump(mode="json"),
+                note=None,
             )
         )
         session.commit()

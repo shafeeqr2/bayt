@@ -25,7 +25,9 @@ services:
       CORS_ORIGINS: '["http://localhost:${FRONTEND_PORT:-3000}"]'
       # Optional: lets the zoning answer read free text and write a cited summary.
       LLM_API_KEY: ${LLM_API_KEY:-}
-      ZONING_MODEL: ${ZONING_MODEL:-claude-opus-5-5}
+      LLM_PROVIDER: ${LLM_PROVIDER:-auto}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      ZONING_MODEL: ${ZONING_MODEL:-}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:

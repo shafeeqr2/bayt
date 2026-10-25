@@ -20,7 +20,7 @@ Source: [`architecture.mmd`](architecture.mmd) (Mermaid). Edit that file and re-
 | From | To | When |
 |---|---|---|
 | backend | City of Toronto GIS (ArcGIS REST) | Lot analysis: 6 to 8 queries per lot for the parcel, neighbours, building footprints, zoning, lot coverage, sixplex permission and centrelines. Results are cached in `lot_analyses` for 30 days. `./start.sh lot-analysis` fills the cache for every Toronto listing. |
-| backend | Claude API (Anthropic SDK) | Optional, with `LLM_API_KEY`: 2 structured-output calls per new zoning question, to read the plan from plain words and to write the cited answer. Cached in `zoning_answers`. |
+| backend | A model API: Anthropic (SDK), or OpenRouter / NVIDIA NIM (OpenAI-style HTTP) | Optional, with `LLM_API_KEY`: 2 structured-output calls per new zoning question, to read the plan from plain words and to write the cited answer. Provider picked from the key prefix. Cached in `zoning_answers`. |
 | importer | Toronto Open Data (CKAN) | `./start.sh city-data`, then the backend runs `app.city.match` to link listings to addresses, lots and zoning, and `app.city.coa` to place Committee of Adjustment applications on address points. |
 | browser | `cdn.realtor.ca` | Listing photos through `next/image`. |
 | browser | OpenFreeMap | Vector tiles under the MapLibre 3D lot scene. |
