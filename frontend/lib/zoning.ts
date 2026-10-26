@@ -138,11 +138,35 @@ export type Candidate = {
   precedents: CardPrecedents | null;
 };
 
+/** The main building that stands today, measured the way the by-law measures setbacks. */
+export type ExistingBuilding = {
+  front_setback_m: number | null;
+  rear_setback_m: number | null;
+  side_setback_left_m: number | null;
+  side_setback_right_m: number | null;
+  building_length_m: number | null;
+  building_depth_m: number | null;
+  building_width_m: number | null;
+  height_m: number | null;
+  footprint_m2: number | null;
+};
+
+/** The lot as a rectangle (frontage by depth, street along the front) for the schematic zoning model. */
+export type LotShape = {
+  frontage_m: number | null;
+  depth_m: number | null;
+  area_m2: number;
+  irregular: boolean;
+  corner_lot: boolean;
+  existing: ExistingBuilding | null;
+};
+
 export type PathwayAnalysis = {
   mode: Mode;
   intent: Intent;
   zone_label: string | null;
   zone: string | null;
+  lot: LotShape;
   gaps: Gap[];
   short_standards: string[];
   unknown_standards: string[];

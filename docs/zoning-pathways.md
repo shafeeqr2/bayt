@@ -269,6 +269,38 @@ fields without the text, playbook version, `PROMPT_VERSION`, model). The text
 itself is not part of the key, so 2 wordings of the same plan cost 1 model call.
 Bump `PROMPT_VERSION` when a prompt or an output schema changes.
 
+## The zoning model
+
+The zoning check has 2 views, "Model" and "Table", with a toggle. The model
+(`frontend/app/listings/[id]/zoning-model.tsx`) is a schematic, not the house:
+
+- the lot as a rectangle, `frontage_m` by `depth_m`, street along the front;
+- the planned building as a box (setbacks, length and height from the gaps, the
+  existing wall or a by-law default as a placeholder);
+- the most the by-law allows as a translucent blue box (required setbacks, the
+  depth and length caps, the height limit);
+- 1 dimension line per standard, drawn where the by-law measures it: green
+  fits, orange is short, grey dashed is unknown. Floor space index, storeys and
+  units have no place on a box, so they are badges under the scene;
+- the building that stands today as a dotted outline on the floor, when its
+  position is known.
+
+The scene is SVG with an orthographic projection: no WebGL, no library, works on
+a phone, prints. 4 preset views (street, side, top, 3D) tween the camera; drag
+turns it. Hover or tap a line, a badge or a table row, and a card beside the
+scene gives the plain-words meaning (`frontend/lib/zoning-glossary.ts`: what it
+is, why the by-law has it, how it is measured), the 3 numbers and the verdict.
+The table and the model share the active standard.
+
+For this the analysis carries `lot: LotShapeOut` (frontage, depth, area,
+irregular, corner, and the existing main building's setbacks, length, depth,
+width, height and footprint, from `EnvelopeInfo`). On an irregular lot the
+rectangle is approximate and the card says so.
+
+Not built yet: dragging a wall or the roof to see the lines flip; the
+neighbours' rear walls as a reference line; typing an unknown number on its
+line.
+
 The form on the listing page takes the text first. "Give the details" opens the
 structured fields; a detail typed there wins over the text. The written answer
 sits above the gap table, each paragraph with its citation chips, and says how

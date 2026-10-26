@@ -21,6 +21,7 @@ import {
   type Project,
 } from "@/lib/zoning";
 import { OutcomeLabel, SummaryChips } from "./precedents-ui";
+import { TermCard, ZoningModel, buildScene } from "./zoning-model";
 
 const PROJECTS: [Project, string][] = [
   ["unknown", "Not sure yet"],
@@ -339,39 +340,72 @@ function Segmented({
 
 function Results({ result }: { result: PathwayAnalysis }) {
   const shown = result.gaps.filter((g) => g.status !== "not_applicable" || g.existing_status === "short");
+  const [view, setView] = useState<"table" | "model">("model");
+  // The standard under the pointer, and the one tapped to stay. The model and the table share both.
+  const [hover, setHover] = useState<string | null>(null);
+  const [pinned, setPinned] = useState<string | null>(null);
+  const active = hover ?? pinned;
+  const activeGap = active ? result.gaps.find((g) => g.standard === active) ?? null : null;
+  const scene = buildScene(result);
   return (
     <div className="space-y-6">
       <div className="space-y-3">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="font-semibold">
             Zoning check
             {result.zone_label && <span className="ml-2 font-mono text-xs font-normal text-muted">{result.zone_label}</span>}
           </h3>
-          <p className="text-sm text-muted">
-            {result.short_standards.length === 0
-              ? "Nothing short of the by-law in what you gave."
-              : `Short on ${result.short_standards.length} ${result.short_standards.length === 1 ? "standard" : "standards"}.`}
-            {result.unknown_standards.length > 0 && ` ${result.unknown_standards.length} could not be judged.`}
-          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="text-sm text-muted">
+              {result.short_standards.length === 0
+                ? "Nothing short of the by-law in what you gave."
+                : `Short on ${result.short_standards.length} ${result.short_standards.length === 1 ? "standard" : "standards"}.`}
+              {result.unknown_standards.length > 0 && ` ${result.unknown_standards.length} could not be judged.`}
+            </p>
+            <Segmented
+              value={view}
+              onChange={(v) => setView(v as "table" | "model")}
+              options={[
+                ["model", "Model"],
+                ["table", "Table"],
+              ]}
+            />
+          </div>
         </div>
-        <div className="overflow-x-auto rounded-xl border border-border bg-surface">
-          <table className="w-full text-sm">
-            <thead className="text-left text-muted">
-              <tr className="border-b border-border">
-                <th className="px-4 py-2 font-medium">Standard</th>
-                <th className="px-4 py-2 font-medium">By-law</th>
-                <th className="px-4 py-2 font-medium">Your plan</th>
-                <th className="px-4 py-2 font-medium">Today</th>
-                <th className="px-4 py-2 font-medium">Result</th>
-              </tr>
-            </thead>
-            <tbody>
-              {shown.map((g) => (
-                <GapRow key={g.standard} gap={g} />
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {view === "model" ? (
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_18rem]">
+            <ZoningModel analysis={result} active={active} onHover={setHover} onPin={setPinned} />
+            <TermCard gap={activeGap} scene={scene} />
+          </div>
+        ) : (
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_18rem]">
+            <div className="overflow-x-auto rounded-xl border border-border bg-surface">
+              <table className="w-full text-sm">
+                <thead className="text-left text-muted">
+                  <tr className="border-b border-border">
+                    <th className="px-4 py-2 font-medium">Standard</th>
+                    <th className="px-4 py-2 font-medium">By-law</th>
+                    <th className="px-4 py-2 font-medium">Your plan</th>
+                    <th className="px-4 py-2 font-medium">Today</th>
+                    <th className="px-4 py-2 font-medium">Result</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {shown.map((g) => (
+                    <GapRow
+                      key={g.standard}
+                      gap={g}
+                      active={active === g.standard}
+                      onHover={setHover}
+                      onPin={() => setPinned(pinned === g.standard ? null : g.standard)}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <TermCard gap={activeGap} scene={scene} />
+          </div>
+        )}
       </div>
 
       <div className="space-y-3">
@@ -427,12 +461,27 @@ function num(value: number | null, unit: string): string {
   return `${text} ${unit}`;
 }
 
-function GapRow({ gap }: { gap: Gap }) {
+function GapRow({
+  gap,
+  active,
+  onHover,
+  onPin,
+}: {
+  gap: Gap;
+  active: boolean;
+  onHover: (standard: string | null) => void;
+  onPin: () => void;
+}) {
   const [label, tone] = STATUS[gap.status];
   const source =
     gap.proposed_source === "existing" ? " (as today)" : gap.proposed_source === "derived" ? " (calculated)" : "";
   return (
-    <tr className="border-b border-border align-top last:border-0">
+    <tr
+      className={`cursor-pointer border-b border-border align-top last:border-0 ${active ? "bg-background" : ""}`}
+      onPointerEnter={() => onHover(gap.standard)}
+      onPointerLeave={() => onHover(null)}
+      onClick={onPin}
+    >
       <td className="px-4 py-2">
         <div>{gap.label}</div>
         {gap.clause_ids.length > 0 && (

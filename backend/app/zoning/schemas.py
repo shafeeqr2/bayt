@@ -64,11 +64,41 @@ class CandidateOut(BaseModel):
     )
 
 
+class ExistingBuildingOut(BaseModel):
+    """The main building that stands today, as the by-law measures it (see `EnvelopeInfo`)."""
+
+    front_setback_m: float | None
+    rear_setback_m: float | None
+    side_setback_left_m: float | None
+    side_setback_right_m: float | None
+    building_length_m: float | None
+    building_depth_m: float | None
+    building_width_m: float | None
+    height_m: float | None
+    footprint_m2: float | None = Field(None, description="Footprint of the main building")
+
+
+class LotShapeOut(BaseModel):
+    """The lot and the existing building as plain numbers, so the page can draw the zoning model.
+
+    The model is a schematic: a rectangle of `frontage_m` by `depth_m` with the street along the
+    front. On an irregular lot the rectangle is approximate and the page says so.
+    """
+
+    frontage_m: float | None
+    depth_m: float | None
+    area_m2: float
+    irregular: bool
+    corner_lot: bool
+    existing: ExistingBuildingOut | None = Field(None, description="None when no main building stands on the lot")
+
+
 class PathwayAnalysis(BaseModel):
     mode: Literal["buyer", "professional"]
     intent: Intent
     zone_label: str | None
     zone: str | None
+    lot: LotShapeOut
     gaps: list[GapOut]
     short_standards: list[str]
     unknown_standards: list[str]

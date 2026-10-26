@@ -144,3 +144,19 @@ def test_every_card_is_well_formed():
         assert paths(parse(c.trigger)) <= set(FACT_PATHS)
         assert c.category != "constraint" or c.covers == []
     assert len({c.id for c in cards}) == len(cards)
+
+
+def test_analysis_carries_the_lot_shape_for_the_model(narrow_house_lot):
+    """The page draws a schematic lot from these numbers; they must be the by-law measurements, not guesses."""
+    out = analyze_pathways(narrow_house_lot, Intent(mode="buyer", project="addition", keep_existing_walls=True))
+    assert out.lot.frontage_m == pytest.approx(12.0, abs=0.05)
+    assert out.lot.depth_m == pytest.approx(40.0, abs=0.05)
+    assert out.lot.area_m2 == pytest.approx(480.0, rel=0.01)
+    e = out.lot.existing
+    assert e is not None
+    assert e.front_setback_m == pytest.approx(6.0, abs=0.05)
+    assert e.rear_setback_m == pytest.approx(22.0, abs=0.05)
+    assert e.side_setback_left_m == pytest.approx(0.6, abs=0.05)
+    assert e.building_length_m == pytest.approx(12.0, abs=0.05)
+    assert e.height_m == 7.2
+    assert e.footprint_m2 == pytest.approx(7.5 * 12.0, rel=0.02)

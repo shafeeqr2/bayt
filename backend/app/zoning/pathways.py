@@ -15,7 +15,7 @@ from app.zoning.gaps import analyze_gaps
 from app.zoning.intent import Intent
 from app.zoning.precedents import Precedent, for_card, summarize
 from app.zoning.predicate import Truth
-from app.zoning.schemas import CandidateOut, GapOut, LegalBasisOut, PathwayAnalysis
+from app.zoning.schemas import CandidateOut, ExistingBuildingOut, GapOut, LegalBasisOut, LotShapeOut, PathwayAnalysis
 
 
 def analyze_pathways(
@@ -81,11 +81,34 @@ def analyze_pathways(
             )
         )
 
+    e = lot.envelope
+    shape = LotShapeOut(
+        frontage_m=lot.parcel.frontage_m,
+        depth_m=lot.parcel.depth_m,
+        area_m2=lot.parcel.area_m2,
+        irregular=lot.parcel.irregular,
+        corner_lot=lot.parcel.corner_lot,
+        existing=ExistingBuildingOut(
+            front_setback_m=e.front_setback_m,
+            rear_setback_m=e.rear_setback_m,
+            side_setback_left_m=e.side_setback_left_m,
+            side_setback_right_m=e.side_setback_right_m,
+            building_length_m=e.building_length_m,
+            building_depth_m=e.building_depth_m,
+            building_width_m=e.building_width_m,
+            height_m=e.height_m,
+            footprint_m2=lot.coverage.main_building_m2,
+        )
+        if e
+        else None,
+    )
+
     return PathwayAnalysis(
         mode=intent.mode,
         intent=intent,
         zone_label=lot.zoning.zone_label,
         zone=lot.zoning.zone,
+        lot=shape,
         gaps=[GapOut(**asdict(g)) for g in gaps],
         short_standards=[g.standard for g in gaps if g.status == "short"],
         unknown_standards=[g.standard for g in gaps if g.status == "unknown"],
