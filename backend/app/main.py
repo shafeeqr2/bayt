@@ -353,6 +353,19 @@ def post_listing_photos_read(listing_id: str, session: SessionDep, force: bool =
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
+@app.post("/api/listings/{listing_id}/photos/review")
+def post_listing_photos_review(listing_id: str, session: SessionDep) -> photo_reader.ListingPhotos:
+    """The second pass alone: all stored labels in one text-model call; fixes the level, room and front-or-back calls."""
+    listing = session.get(Listing, listing_id)
+    if listing is None:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    try:
+        photo_reader.review_labels(session, listing)
+    except zoning_answer.ModelUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return photo_reader.labels_for(session, listing)
+
+
 @app.get("/api/lot")
 def get_lot(
     lat: Annotated[float, Query(ge=-90, le=90)],

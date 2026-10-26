@@ -41,6 +41,70 @@ them. The model still names furniture in about 1 caption in 5. A caption that
 matches the `FURNITURE` word list is asked for once more, with the words to
 leave out named. The second answer wins when it names fewer of them.
 
+## The second pass
+
+One photo at a time gets the floor wrong about 1 time in 10: a main-floor
+bedroom with hardwood becomes "the basement family room", the basement kitchen
+becomes the main floor. After the photos are read, `review_labels()` sends every
+label of the listing and a contact sheet of all the photos (`sheet.py`: numbered
+thumbnails, 8 per row, 1 JPEG) to the vision model in 1 call. It sees the
+finishes side by side, the order of the photos, the listed rooms per level, and
+the stairs, and returns only the photos whose kind, level or room changes
+(`Fix`).
+
+Why a sheet: the vision model takes at most a few dozen images per call (50
+image parts are refused), and the text model cannot compare finishes it does not
+see. On the trial listing the text model missed the 3 basement photos labelled
+main floor, or "fixed" the foyer into the basement; with the sheet the vision
+model found exactly the 3, in 2 to 3 s, on 2 runs out of 2.
+
+The reviewer is not stable: the same labels get different fixes from call to
+call, and one host moved the whole basement to the main floor. So the pass
+runs 5 times in parallel and a fix counts only when 3 runs propose the same
+photo, kind and level (`consensus()`). A level change then faces a pixel check
+(`neighbours_agree()`): a colour histogram of the lower 60% of each thumbnail
+(`sheet.finish_histogram`) finds the 5 photos that look most like this one,
+among the interior photos not being moved in the same pass. When most of them
+sit on another floor, the change is dropped. On the trial listing the 3
+hardwood bedrooms are each other's nearest neighbours and then the other
+main-floor photos, and the basement kitchen photos sit next to each other, so
+a run that moved the bedrooms to the basement is blocked and a run that moved
+the basement kitchen out of the main floor goes through.
+
+The pass runs 2 rounds after a read. On the trial listing the first round fixed
+2 of the 3 basement photos labelled main floor; the second round, which sees
+those 2 already in the basement, fixed the third.
+
+Guards on the model's answer:
+
+- Each fix repeats the label as given (`kind_was`, `level_was`, `room_was`). A fix that does not match the stored label is a misread and is skipped. The first version without these fields wrote "corrected to main" in its reason and "basement" in the field.
+- A photo with stairs going down is not the basement: the camera stands above them.
+- `room` must be listed on the photo's level. A "Dining room" listed only on the main floor is dropped from a basement photo.
+- The level words in the title and the caption are swapped ("Main-floor kitchen" becomes "Basement kitchen"); the rest of the sentence stays.
+
+The change and the model's reason go in the row's `note`, so the API shows what
+the second pass did. `POST /api/listings/{id}/photos/review` runs the pass alone.
+It takes about 4 s: 1 s to fetch the thumbnails and build the sheet, 3 s for
+the 5 calls in parallel.
+
+## The bytes, not the URL
+
+The reader fetches each photo itself and sends it as a JPEG data URL, at most
+1280 px on the long side. With the CDN URL alone, the host fetches the image
+and may serve a stale copy from its cache: on 308 Morrish Road the first photo
+had been a survey drawing before the listing changed its photos, and the model
+kept describing "two proposed lots, Part 1 and Part 2" for an aerial photo that
+every other client downloaded. The bytes also feed the drawing check below.
+
+## A false floor plan
+
+A `floor_plan` label will later replace the generated plan, so it must be
+right. On 308 Morrish Road the model called an aerial drone photo "a survey
+drawing with proposed lot areas". A drawing is a light page with little colour,
+so `sheet.light_share()` measures the share of light, near-grey pixels in the
+thumbnail. A `floor_plan` label on an image below 0.6 is asked for again with
+the note that this is a photograph; a second `floor_plan` becomes `other`.
+
 ## Model and format
 
 | Provider | Default vision model |
