@@ -112,7 +112,9 @@ class Backend(Protocol):
 
     model: str
 
-    def structured(self, *, system: str, user: str, schema: type[BaseModel], effort: str, max_tokens: int) -> BaseModel: ...
+    def structured(
+        self, *, system: str, user: str, schema: type[BaseModel], effort: str, max_tokens: int, images: list[str] | None = None
+    ) -> BaseModel: ...
 
 
 @dataclass(frozen=True)
@@ -152,17 +154,22 @@ def model_name(provider: Provider | None = None) -> str:
     return settings.zoning_model or (p.default_model if p else "")
 
 
-def make_client() -> Backend | None:
-    """A backend when credentials exist, else None."""
+def make_client(model: str | None = None, json_mode: str = "schema") -> Backend | None:
+    """A backend when credentials exist, else None.
+
+    `model` overrides the configured zoning model. `json_mode` is "schema" (the
+    provider enforces the JSON schema) or "object" (plain JSON mode with the schema
+    in the prompt; see OpenAIBackend). Anthropic always validates against the schema.
+    """
     p = resolve_provider()
     if p is None:
         return None
-    model = model_name(p)
+    model = model or model_name(p)
     if p.kind == "anthropic":
         return AnthropicBackend(settings.llm_api_key or "", model)
     if not p.base_url or not model:
         return None
-    return OpenAIBackend(settings.llm_api_key or "", p.base_url, model, p.name)
+    return OpenAIBackend(settings.llm_api_key or "", p.base_url, model, p.name, json_mode=json_mode)
 
 
 class AnthropicBackend:
@@ -173,17 +180,22 @@ class AnthropicBackend:
         self._client = client
         self._api_key = api_key
 
-    def structured(self, *, system: str, user: str, schema: type[BaseModel], effort: str, max_tokens: int) -> BaseModel:
+    def structured(
+        self, *, system: str, user: str, schema: type[BaseModel], effort: str, max_tokens: int, images: list[str] | None = None
+    ) -> BaseModel:
         import anthropic
 
         if self._client is None:
             self._client = anthropic.Anthropic(api_key=self._api_key)
+        content: Any = user
+        if images:
+            content = [{"type": "image", "source": {"type": "url", "url": url}} for url in images] + [{"type": "text", "text": user}]
         try:
             response = self._client.messages.parse(
                 model=self.model,
                 max_tokens=max_tokens,
                 system=system,
-                messages=[{"role": "user", "content": user}],
+                messages=[{"role": "user", "content": content}],
                 output_format=schema,
                 output_config={"effort": effort},
             )
@@ -210,30 +222,55 @@ class OpenAIBackend:
     This is how OpenRouter and NVIDIA NIM serve the Nemotron models. The JSON comes
     back as the message text; it is validated with the pydantic schema here, so a
     provider that ignores the schema still cannot slip a wrong shape through.
+
+    `json_mode="object"` sends `response_format: {"type": "json_object"}` with the
+    schema in the system prompt instead. The grammar-constrained "json_schema" mode
+    makes the Nemotron vision model stall on enum fields (it emits whitespace until
+    the token budget is gone); plain JSON mode is 3x faster and never stalls, and
+    the pydantic check below still rejects a wrong shape.
     """
 
-    def __init__(self, api_key: str, base_url: str, model: str, provider: str = "openai", transport: httpx.BaseTransport | None = None):
+    def __init__(
+        self,
+        api_key: str,
+        base_url: str,
+        model: str,
+        provider: str = "openai",
+        transport: httpx.BaseTransport | None = None,
+        json_mode: str = "schema",
+    ):
         self.model = model
         self.provider = provider
+        self.json_mode = json_mode
         self._url = base_url.rstrip("/") + "/chat/completions"
         headers = {"authorization": f"Bearer {api_key}", "content-type": "application/json"}
         if provider == "openrouter":
             headers["x-title"] = "Bayt zoning pathways"
         self._http = httpx.Client(headers=headers, timeout=180.0, transport=transport)
 
-    def structured(self, *, system: str, user: str, schema: type[BaseModel], effort: str, max_tokens: int) -> BaseModel:
+    def structured(
+        self, *, system: str, user: str, schema: type[BaseModel], effort: str, max_tokens: int, images: list[str] | None = None
+    ) -> BaseModel:
+        content: Any = user
+        if images:
+            content = [{"type": "text", "text": user}] + [{"type": "image_url", "image_url": {"url": url}} for url in images]
+        system = system + "\n\nAnswer with one JSON object that matches the given schema. No prose outside the JSON."
+        response_format: dict[str, Any] = {
+            "type": "json_schema",
+            "json_schema": {"name": schema.__name__, "strict": True, "schema": schema.model_json_schema()},
+        }
+        if self.json_mode == "object":
+            system += "\n\nJSON schema:\n" + json.dumps(schema.model_json_schema())
+            response_format = {"type": "json_object"}
         body = {
             "model": self.model,
             "max_tokens": max_tokens,
             "temperature": 0,
             "messages": [
-                {"role": "system", "content": system + "\n\nAnswer with one JSON object that matches the given schema. No prose outside the JSON."},
-                {"role": "user", "content": user},
+                {"role": "system", "content": system},
+                {"role": "user", "content": content},
             ],
-            "response_format": {
-                "type": "json_schema",
-                "json_schema": {"name": schema.__name__, "strict": True, "schema": schema.model_json_schema()},
-            },
+            "response_format": response_format,
         }
         if self.provider == "openrouter":
             # Reasoning models think inside the output budget and Nemotron thinks for minutes

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
-import { getListing } from "@/lib/api";
+import { getListing, getPhotoLabels } from "@/lib/api";
 import { formatParking, formatPrice, formatSqft } from "@/lib/format";
 import { CitySection } from "./city-section";
 import { FloorPlanSection } from "./floor-plan";
@@ -11,7 +11,7 @@ import { PotentialChips } from "../../potential-chips";
 
 export default async function ListingPage({ params }: PageProps<"/listings/[id]">) {
   const { id } = await params;
-  const listing = await getListing(id);
+  const [listing, photoLabels] = await Promise.all([getListing(id), getPhotoLabels(id)]);
   if (!listing) notFound();
 
   const bedrooms =
@@ -47,7 +47,7 @@ export default async function ListingPage({ params }: PageProps<"/listings/[id]"
       </Link>
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-        <Gallery photos={listing.photos} alt={listing.address ?? "Listing"} />
+        <Gallery photos={listing.photos} alt={listing.address ?? "Listing"} labels={photoLabels?.photos} />
 
         <div className="space-y-6">
           <div className="space-y-1">

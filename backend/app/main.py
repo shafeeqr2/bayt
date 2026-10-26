@@ -16,6 +16,7 @@ from app.lot import service as lot_service
 from app.lot.floorplan import FloorPlanResult
 from app.lot.schemas import LotAnalysis
 from app.models import Listing, ListingCityData, ListingInvestment
+from app.photos import reader as photo_reader
 from app.schemas import (
     CityData,
     Facets,
@@ -325,6 +326,31 @@ def get_listing_floorplan(listing_id: str, session: SessionDep) -> FloorPlanResu
         return FloorPlanResult(plan=None, reason="The city's map service did not answer; try again later.")
     except floorplan.NoPlan as exc:
         return FloorPlanResult(plan=None, reason=str(exc))
+
+
+@app.get("/api/listings/{listing_id}/photos")
+def get_listing_photos(listing_id: str, session: SessionDep) -> photo_reader.ListingPhotos:
+    """The stored photo labels (title, one sentence, facts about the house). Never calls the model."""
+    listing = session.get(Listing, listing_id)
+    if listing is None:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    return photo_reader.labels_for(session, listing)
+
+
+@app.post("/api/listings/{listing_id}/photos/read")
+def post_listing_photos_read(listing_id: str, session: SessionDep, force: bool = False) -> photo_reader.ListingPhotos:
+    """Read the listing's photos with the vision model and store the labels.
+
+    One structured call per photo, in parallel. Photos already read with the current
+    prompt are skipped unless `force`. Without LLM_API_KEY this is a 503.
+    """
+    listing = session.get(Listing, listing_id)
+    if listing is None:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    try:
+        return photo_reader.read_listing_photos(session, listing, force=force)
+    except zoning_answer.ModelUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @app.get("/api/lot")

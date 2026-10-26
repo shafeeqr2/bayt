@@ -3,9 +3,25 @@
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
+import type { PhotoFacts, PhotoLabel } from "@/lib/api";
+
 type Photo = { high: string; medium: string };
 
-export function Gallery({ photos, alt }: { photos: Photo[]; alt: string }) {
+const KIND_LABELS: Record<PhotoFacts["kind"], string> = {
+  exterior_front: "Front",
+  exterior_back: "Back",
+  exterior_side: "Side",
+  street: "Street",
+  aerial: "From above",
+  interior: "Inside",
+  floor_plan: "Floor plan",
+  other: "Other",
+};
+
+const LEVEL_LABELS = { basement: "Basement", main: "Main floor", second: "Second floor", third: "Third floor", unknown: "" } as const;
+
+/** The photos with, when the listing's photos have been read, a title and one sentence about the house under each. */
+export function Gallery({ photos, alt, labels = [] }: { photos: Photo[]; alt: string; labels?: PhotoLabel[] }) {
   const [index, setIndex] = useState(0);
   const count = photos.length;
 
@@ -26,6 +42,7 @@ export function Gallery({ photos, alt }: { photos: Photo[]; alt: string }) {
     );
   }
 
+  const label = labels[index]?.facts ?? null;
   const arrowClass =
     "absolute top-1/2 -translate-y-1/2 flex size-10 items-center justify-center rounded-full bg-surface/90 text-lg shadow backdrop-blur hover:bg-surface";
 
@@ -66,6 +83,23 @@ export function Gallery({ photos, alt }: { photos: Photo[]; alt: string }) {
           {index + 1} / {count}
         </span>
       </div>
+      {label && (
+        <div className="space-y-0.5" aria-live="polite">
+          <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
+            <span className="font-medium">{label.title}</span>
+            <span className="text-xs text-muted">
+              {[
+                label.kind === "interior" ? null : KIND_LABELS[label.kind],
+                label.room && label.room.toLowerCase() !== label.title.toLowerCase() ? label.room : null,
+                label.kind === "interior" && label.level && label.level !== "unknown" ? LEVEL_LABELS[label.level] : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </span>
+          </p>
+          <p className="text-sm text-muted">{label.caption}</p>
+        </div>
+      )}
       {count > 1 && (
         <div className="flex gap-2 overflow-x-auto pb-1">
           {photos.map((photo, i) => (

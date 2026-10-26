@@ -190,6 +190,16 @@ A room up to 15% larger than the space available is drawn smaller and flagged; a
 It needs the lot analysis, so it covers Toronto houses only; condos and other cities get a one-line reason instead.
 The method is in the docstring of `backend/app/lot/floorplan.py`.
 
+## Photo labels
+
+A vision model reads each listing photo and returns a title, one sentence about the house (not the furniture), and facts a floor plan can use: the room, the windows and their wall, doors to outside, stairs, the garage side. The labels show under the gallery. Reading is explicit:
+
+```bash
+curl -X POST http://localhost:8000/api/listings/30401713/photos/read
+```
+
+Default model: `nvidia/nemotron-3.5-super-vl` on OpenRouter, about 8 s and 2 cents for 50 photos. See `docs/photo-labels.md`.
+
 ## Zoning pathways
 
 For a Toronto house, the API compares a proposal (an addition, a rebuild, more units, a garden or laneway suite, a severance) with Zoning By-law 569-2013 and lists the public routes that address each shortfall, with their risks. Phase 1 is deterministic: rule resolution, gap analysis and a hand-written playbook matched by predicate. No language model is involved. The listing page has the form under "What could you build here?".

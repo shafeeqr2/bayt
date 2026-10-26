@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     # Model id in the provider's naming. Empty = the provider's default in
     # app.zoning.answer.PROVIDERS (claude-opus-5-5 on Anthropic, a Nemotron on OpenRouter).
     zoning_model: str = ""
+    # Vision model for the photo labels. Empty = the provider's default in
+    # app.photos.reader.DEFAULT_MODELS (a Nemotron VL on OpenRouter and NIM, Claude on Anthropic).
+    photo_model: str = ""
 
 
 settings = Settings()

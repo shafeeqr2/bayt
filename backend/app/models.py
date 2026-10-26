@@ -195,3 +195,30 @@ class ZoningAnswer(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+
+class ListingPhoto(Base):
+    """What a vision model saw in one listing photo (`app.photos.reader.PhotoFacts`).
+
+    Keyed by the listing and the photo index. `url` and `prompt_version` say what
+    was read; a changed photo or prompt reads again. `facts` is null when the model
+    gave nothing usable, with the reason in `note`.
+    """
+
+    __tablename__ = "listing_photos"
+
+    listing_id: Mapped[str] = mapped_column(
+        String(32), ForeignKey("listings.id", ondelete="CASCADE"), primary_key=True
+    )
+    photo_index: Mapped[int] = mapped_column(Integer, primary_key=True)
+    url: Mapped[str] = mapped_column(Text)
+    model: Mapped[str] = mapped_column(Text)
+    prompt_version: Mapped[int] = mapped_column(Integer)
+    facts: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    note: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )

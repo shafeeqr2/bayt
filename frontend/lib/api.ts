@@ -319,6 +319,37 @@ export type FloorPlan = {
 };
 
 /** A possible floor plan fitted from the city's building outline and the listed rooms, or why there is none. */
+/** What the vision model saw in one listing photo; about the house, never the furniture. */
+export type PhotoFacts = {
+  kind: "exterior_front" | "exterior_back" | "exterior_side" | "street" | "aerial" | "interior" | "floor_plan" | "other";
+  title: string;
+  caption: string;
+  level: "basement" | "main" | "second" | "third" | "unknown" | null;
+  room: string | null;
+  windows: number | null;
+  window_wall: "left" | "right" | "far" | "several" | "none" | "unknown";
+  exterior_doors: number;
+  stairs: "none" | "up" | "down" | "both";
+  open_to: string[];
+  storeys: number | null;
+  garage: "left" | "right" | "centre" | "none" | "unknown";
+};
+
+export type PhotoLabel = { index: number; url: string; facts: PhotoFacts | null; note: string | null };
+
+export type ListingPhotos = {
+  listing_id: string;
+  model: string | null;
+  read: number;
+  total: number;
+  photos: PhotoLabel[];
+};
+
+/** The stored photo labels. Never triggers a model call. */
+export async function getPhotoLabels(id: string): Promise<ListingPhotos | null> {
+  return get(`/api/listings/${encodeURIComponent(id)}/photos`);
+}
+
 export async function getFloorPlan(id: string): Promise<{ plan: FloorPlan | null; reason: string | null } | null> {
   return get(`/api/listings/${encodeURIComponent(id)}/floorplan`);
 }
