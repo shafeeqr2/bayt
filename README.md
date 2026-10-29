@@ -45,6 +45,7 @@ The frontend talks to the API from the server side only, using `BACKEND_URL` (se
 ./start.sh down                # stop Postgres + API (data is kept)
 ./start.sh reset               # wipe your local database and reseed
 ./start.sh city-data           # load or refresh City of Toronto data (zoning, lots, permits, Committee of Adjustment)
+./start.sh profiles            # write the house profiles and embeddings behind "similar homes"
 ./start.sh test                # run backend tests
 ./start.sh logs                # follow backend logs
 ./start.sh psql                # open a Postgres shell

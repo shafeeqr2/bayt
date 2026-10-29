@@ -48,7 +48,7 @@ NEIGHBOURS = 5  # a level change is vetoed when most of these nearest photos sit
 REVIEW_ROUNDS = 2  # the second round sees the labels the first round corrected, so the last stragglers find their floor
 MAX_TOKENS = 500
 # Vision models per provider. The zoning model (a text model) does not read images.
-DEFAULT_MODELS = {"openrouter": "nvidia/nemotron-3.5-super-vl", "nvidia": "nvidia/nemotron-3.5-super-vl", "anthropic": "claude-opus-5-5"}
+DEFAULT_MODELS = {"openrouter": "nvidia/nemotron-3.5-super-vl:free", "nvidia": "nvidia/nemotron-3.5-super-vl", "anthropic": "claude-opus-5-5"}
 
 Kind = Literal["exterior_front", "exterior_back", "exterior_side", "street", "aerial", "interior", "floor_plan", "other"]
 Level = Literal["basement", "main", "second", "third", "unknown"]

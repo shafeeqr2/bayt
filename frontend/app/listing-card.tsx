@@ -1,20 +1,28 @@
 import Image from "next/image";
 import Link from "next/link";
 
-import type { ListingSummary } from "@/lib/api";
+import { bestPersona, PERSONA_LABELS, type ListingSummary, type PersonaKey } from "@/lib/api";
 import { bedsLabel, formatPrice, formatSqft } from "@/lib/format";
 import { PotentialChips } from "./potential-chips";
 
-export function ListingCard({ listing, eager }: { listing: ListingSummary; eager: boolean }) {
+/**
+ * One search result. With a `persona` the badge is that buyer's score from the house
+ * profile; without one it is the persona the house suits best. No badge until the
+ * profile is written.
+ */
+export function ListingCard({ listing, eager, persona }: { listing: ListingSummary; eager: boolean; persona?: PersonaKey }) {
   const facts = [
     bedsLabel(listing.bedrooms_text),
     listing.bathrooms != null ? `${listing.bathrooms} ba` : null,
     formatSqft(listing.sqft_min, listing.sqft_max),
   ].filter(Boolean);
+  const chosen = persona && listing.persona_scores?.[persona] != null ? { persona, score: listing.persona_scores[persona]! } : null;
+  const badge = chosen ?? bestPersona(listing.persona_scores);
+  const href = `/listings/${listing.id}${persona ? `?persona=${persona}` : badge ? `?persona=${badge.persona}` : ""}`;
 
   return (
     <Link
-      href={`/listings/${listing.id}`}
+      href={href}
       className="group overflow-hidden rounded-xl border border-border bg-surface transition-shadow hover:shadow-lg"
     >
       <div className="relative aspect-[4/3] bg-border">
@@ -32,6 +40,14 @@ export function ListingCard({ listing, eager }: { listing: ListingSummary; eager
         {listing.building_type && (
           <span className="absolute left-3 top-3 rounded-full bg-surface/90 px-2.5 py-1 text-xs font-medium backdrop-blur">
             {listing.building_type}
+          </span>
+        )}
+        {badge && (
+          <span
+            className="absolute right-3 top-3 rounded-full bg-foreground/90 px-2.5 py-1 text-xs font-medium tabular-nums text-background backdrop-blur"
+            title={`${PERSONA_LABELS[badge.persona]} fit, from the house profile`}
+          >
+            {PERSONA_LABELS[badge.persona]} {badge.score}/10
           </span>
         )}
       </div>

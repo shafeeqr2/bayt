@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { getFacets, getListings, type Facets } from "@/lib/api";
+import { getFacets, getListings, PERSONA_LABELS, PERSONAS, type Facets, type PersonaKey } from "@/lib/api";
 import { ListingCard } from "./listing-card";
 import { MapSearchLoader } from "./map-search-loader";
 
@@ -15,6 +15,7 @@ const FILTER_KEYS = [
   "min_beds",
   "min_baths",
   "sort",
+  "persona",
   "potential",
   "view",
 ] as const;
@@ -30,6 +31,8 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   }
   const page = Math.max(1, Number(raw.page) || 1);
   const mapView = filters.view === "map";
+  const persona = PERSONAS.includes(filters.persona as PersonaKey) ? (filters.persona as PersonaKey) : undefined;
+  if (!persona) delete filters.persona;
 
   const apiFilters = Object.fromEntries(Object.entries(filters).filter(([key]) => key !== "view"));
   const query = new URLSearchParams(apiFilters);
@@ -59,7 +62,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       ) : (
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {listings.items.map((listing, i) => (
-            <ListingCard key={listing.id} listing={listing} eager={i < ABOVE_THE_FOLD} />
+            <ListingCard key={listing.id} listing={listing} eager={i < ABOVE_THE_FOLD} persona={persona} />
           ))}
         </div>
       )}
@@ -159,17 +162,21 @@ function FilterBar({ filters, facets }: { filters: Filters; facets: Facets }) {
           </option>
         ))}
       </select>
-      <select
-        name="sort"
-        defaultValue={filters.sort ?? "newest"}
-        aria-label="Sort"
-        className={`${inputClass} lg:col-span-2`}
-      >
+      <select name="persona" defaultValue={filters.persona ?? ""} aria-label="I am a" className={inputClass}>
+        <option value="">Any buyer</option>
+        {PERSONAS.map((p) => (
+          <option key={p} value={p}>
+            {PERSONA_LABELS[p]}
+          </option>
+        ))}
+      </select>
+      <select name="sort" defaultValue={filters.sort ?? "newest"} aria-label="Sort" className={inputClass}>
         <option value="newest">Newest</option>
         <option value="price_asc">Price: low to high</option>
         <option value="price_desc">Price: high to low</option>
+        <option value="fit">Best fit</option>
       </select>
-      <div className="col-span-1 flex justify-end gap-2 md:col-span-3 lg:col-span-6">
+      <div className="col-span-2 flex justify-end gap-2 md:col-span-2 lg:col-span-6">
         <Link
           href="/"
           className="flex h-10 items-center rounded-lg px-4 text-sm text-muted hover:text-foreground"

@@ -114,7 +114,7 @@ def test_openai_backend_without_images_keeps_the_plain_string():
 def test_default_vision_model_follows_the_provider(monkeypatch):
     monkeypatch.setattr(m.settings, "photo_model", "")
     monkeypatch.setattr(m.settings, "llm_api_key", "sk-or-v1-x")
-    assert m.model_name() == "nvidia/nemotron-3.5-super-vl"
+    assert m.model_name() == "nvidia/nemotron-3.5-super-vl:free"
     monkeypatch.setattr(m.settings, "llm_api_key", "sk-ant-x")
     assert m.model_name() == "claude-opus-5-5"
     monkeypatch.setattr(m.settings, "photo_model", "some/other-vl")

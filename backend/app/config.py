@@ -21,6 +21,11 @@ class Settings(BaseSettings):
     # Vision model for the photo labels. Empty = the provider's default in
     # app.photos.reader.DEFAULT_MODELS (a Nemotron VL on OpenRouter and NIM, Claude on Anthropic).
     photo_model: str = ""
+    # Text-and-vision model that writes the house profile (facts + 4 persona pitches) for
+    # "similar homes". Empty = the provider's default in app.similar.profile.DEFAULT_MODELS.
+    profile_model: str = ""
+    # Embedding model for the persona pitches. Empty = app.similar.embed.DEFAULT_MODELS.
+    embed_model: str = ""
 
 
 settings = Settings()

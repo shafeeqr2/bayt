@@ -53,6 +53,8 @@ class ListingSummary(BaseModel):
     community: str | None
     cover_photo: str | None = None
     investment: InvestmentSummary | None = None
+    # Persona -> score 1 to 10 from the house profile (`app.similar.profile`); null until the profile is written.
+    persona_scores: dict[str, int] | None = None
 
 
 class ListingDetail(ListingSummary):

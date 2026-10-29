@@ -42,6 +42,8 @@ export type ListingSummary = {
   community: string | null;
   cover_photo: string | null;
   investment: InvestmentSummary | null;
+  /** Persona -> score 1 to 10 from the house profile; null until the profile is written. */
+  persona_scores: Partial<Record<PersonaKey, number>> | null;
 };
 
 export type ListingDetail = ListingSummary & {
@@ -390,4 +392,96 @@ export async function getPrecedents(id: string, radiusM = 500): Promise<Preceden
   if (res.status === 404 || res.status === 422) return null;
   if (!res.ok) throw new Error(`API ${path} failed: ${res.status}`);
   return res.json();
+}
+
+// --- Similar homes: the house profile and the per-persona neighbours ------------------------
+
+export type PersonaKey = "first_time_buyer" | "investor" | "flipper" | "builder";
+export const PERSONAS: PersonaKey[] = ["first_time_buyer", "investor", "flipper", "builder"];
+export const PERSONA_LABELS: Record<PersonaKey, string> = {
+  first_time_buyer: "First-time buyer",
+  investor: "Investor",
+  flipper: "Flipper",
+  builder: "Builder",
+};
+
+/** The persona with the highest score, for a card that shows one badge. */
+export function bestPersona(scores: Partial<Record<PersonaKey, number>> | null | undefined): { persona: PersonaKey; score: number } | null {
+  if (!scores) return null;
+  let best: { persona: PersonaKey; score: number } | null = null;
+  for (const persona of PERSONAS) {
+    const score = scores[persona];
+    if (score != null && (best == null || score > best.score)) best = { persona, score };
+  }
+  return best;
+}
+
+export type PersonaView = {
+  persona: PersonaKey;
+  label: string;
+  score: number;
+  pitch: string;
+  signals: string[];
+  concerns: string[];
+  embedded: boolean;
+};
+
+export type HouseFacts = {
+  era: string | null;
+  style: string | null;
+  layout: string | null;
+  kitchen_finish: number | null;
+  bath_finish: number | null;
+  overall_condition: number | null;
+  renovation_era: string | null;
+  basement: "finished" | "partly_finished" | "unfinished" | "none" | "unknown";
+  basement_suite: "legal_unit" | "apartment" | "kitchenette" | "none" | "unknown";
+  separate_entrance: boolean | null;
+  outdoor: string | null;
+  light: string | null;
+  summary: string;
+};
+
+export type HouseProfile = {
+  listing_id: string;
+  model: string | null;
+  prompt_version: number | null;
+  facts: HouseFacts | null;
+  personas: PersonaView[];
+  note: string | null;
+  computed_at: string | null;
+};
+
+export type SimilarHome = {
+  listing: ListingSummary;
+  score: number;
+  reason: string;
+  distance: number;
+  signals: string[];
+};
+
+export type SimilarHomes = {
+  listing_id: string;
+  persona: PersonaKey;
+  label: string;
+  source_score: number | null;
+  source_signals: string[];
+  distinct: string | null;
+  items: SimilarHome[];
+  candidates: number;
+  filters: string[];
+  model: string | null;
+  reranked: boolean;
+  cached: boolean;
+  note: string | null;
+};
+
+/** The stored house profile (facts + 4 persona views). Never triggers a model call. */
+export async function getHouseProfile(id: string): Promise<HouseProfile | null> {
+  return get(`/api/listings/${encodeURIComponent(id)}/profile`);
+}
+
+/** Similar homes for one persona. One cached rerank call on the backend when the profile exists. */
+export async function getSimilarHomes(id: string, persona: PersonaKey): Promise<SimilarHomes | null> {
+  return get(`/api/listings/${encodeURIComponent(id)}/similar?persona=${persona}`);
 }

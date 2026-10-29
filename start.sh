@@ -141,6 +141,14 @@ cmd_lot_analysis() {
   compose exec backend python -m app.strategy.estimate --refresh
 }
 
+cmd_profiles() {
+  check_docker
+  load_env
+  start_services
+  info "Writing house profiles (facts + 4 persona views) and embedding the pitches for 'similar homes'"
+  compose exec backend python -m app.similar.backfill "$@"
+}
+
 cmd_estimates() {
   check_docker
   load_env
@@ -177,6 +185,9 @@ Usage: ./start.sh [command]
                       failures; --refresh recomputes, --help for more)
   estimates           Recompute rent, return and value-add estimates for the
                       strategy search (runs on its own at backend start)
+  profiles [args]     Write the house profile (facts + 4 persona views) for every
+                      listing and embed the pitches, for "similar homes"
+                      (resumable; --refresh rewrites, --limit N, --help for more)
   test [args]         Run backend tests
   logs [service]      Follow logs (default: backend)
   migration "msg"     Autogenerate an Alembic migration from model changes and apply it
@@ -199,6 +210,7 @@ case "$command" in
   city-data) cmd_city_data "$@" ;;
   lot-analysis) cmd_lot_analysis "$@" ;;
   estimates) cmd_estimates ;;
+  profiles) cmd_profiles "$@" ;;
   test) cmd_test "$@" ;;
   psql) cmd_psql ;;
   help | -h | --help) cmd_help ;;

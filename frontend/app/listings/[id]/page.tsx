@@ -2,15 +2,17 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
-import { getListing, getPhotoLabels } from "@/lib/api";
+import { getListing, getPhotoLabels, PERSONA_LABELS, PERSONAS, type PersonaKey } from "@/lib/api";
 import { formatParking, formatPrice, formatSqft } from "@/lib/format";
 import { CitySection } from "./city-section";
 import { FloorPlanSection } from "./floor-plan";
 import { Gallery } from "./gallery";
+import { SimilarRow } from "./similar-row";
 import { PotentialChips } from "../../potential-chips";
 
-export default async function ListingPage({ params }: PageProps<"/listings/[id]">) {
-  const { id } = await params;
+export default async function ListingPage({ params, searchParams }: PageProps<"/listings/[id]">) {
+  const [{ id }, query] = await Promise.all([params, searchParams]);
+  const persona: PersonaKey = PERSONAS.includes(query.persona as PersonaKey) ? (query.persona as PersonaKey) : "first_time_buyer";
   const [listing, photoLabels] = await Promise.all([getListing(id), getPhotoLabels(id)]);
   if (!listing) notFound();
 
@@ -57,6 +59,31 @@ export default async function ListingPage({ params }: PageProps<"/listings/[id]"
               {[listing.community, listing.city, listing.postal_code].filter(Boolean).join(", ")}
             </p>
           </div>
+
+          {listing.persona_scores && (
+            <div className="space-y-1.5">
+              <p className="text-xs text-muted">Who this home suits, 1 to 10. Pick one to see similar homes for that buyer.</p>
+              <nav className="flex flex-wrap gap-2" aria-label="Buyer fit">
+                {PERSONAS.map((key) => {
+                  const score = listing.persona_scores?.[key];
+                  if (score == null) return null;
+                  const active = key === persona;
+                  return (
+                    <Link
+                      key={key}
+                      href={`?persona=${key}#similar`}
+                      scroll={true}
+                      className={`rounded-full border px-3 py-1 text-sm tabular-nums transition-colors ${
+                        active ? "border-foreground bg-foreground text-background" : "border-border bg-surface hover:border-foreground/40"
+                      }`}
+                    >
+                      {PERSONA_LABELS[key]} <span className={active ? "opacity-80" : "text-muted"}>{score}/10</span>
+                    </Link>
+                  );
+                })}
+              </nav>
+            </div>
+          )}
 
           <dl className="grid grid-cols-2 gap-x-6 gap-y-3 rounded-xl border border-border bg-surface p-5 text-sm">
             {facts
@@ -105,6 +132,11 @@ export default async function ListingPage({ params }: PageProps<"/listings/[id]"
           <p className="whitespace-pre-line leading-relaxed text-foreground/90">{listing.description}</p>
         </section>
       )}
+
+      {/* The similar homes answer is one cached model call on the backend, so it streams in. */}
+      <Suspense fallback={<div className="h-64 animate-pulse rounded-xl bg-border" />}>
+        <SimilarRow id={listing.id} persona={persona} />
+      </Suspense>
 
       <div className="max-w-4xl">
         <Suspense fallback={<div className="h-64 animate-pulse rounded-xl bg-border" />}>

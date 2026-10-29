@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func
+from pgvector.sqlalchemy import Vector
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -221,4 +222,75 @@ class ListingPhoto(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+EMBEDDING_DIM = 2048  # nvidia/nemotron-3.5-embed-1b; see app.similar.embed
+
+
+class ListingProfile(Base):
+    """The fact layer of the house profile (`app.similar.profile.Facts`), written once per listing.
+
+    `facts` is null when the model gave nothing usable, with the reason in `note`.
+    `prompt_version` and `model` say what wrote it; a changed prompt writes again.
+    A null is stored as SQL NULL (`none_as_null`), not the JSON value `null`, so the
+    backfill's `facts IS NULL` filter finds the failed rows and tries them again.
+    """
+
+    __tablename__ = "listing_profiles"
+
+    listing_id: Mapped[str] = mapped_column(
+        String(32), ForeignKey("listings.id", ondelete="CASCADE"), primary_key=True
+    )
+    model: Mapped[str] = mapped_column(Text)
+    prompt_version: Mapped[int] = mapped_column(Integer)
+    facts: Mapped[dict[str, Any] | None] = mapped_column(JSONB(none_as_null=True))
+    note: Mapped[str | None] = mapped_column(Text)
+    computed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class ListingPersonaProfile(Base):
+    """One persona's view of a listing: a score, a pitch in that persona's words, and the pitch's embedding.
+
+    4 rows per listing (`app.similar.profile.PERSONAS`). "Similar" searches by cosine
+    distance inside one persona's rows. `embedding` is null until the embed step runs;
+    `embed_model` says which model made it, so a model change re-embeds.
+    """
+
+    __tablename__ = "listing_persona_profiles"
+
+    listing_id: Mapped[str] = mapped_column(
+        String(32), ForeignKey("listings.id", ondelete="CASCADE"), primary_key=True
+    )
+    persona: Mapped[str] = mapped_column(String(32), primary_key=True)
+    score: Mapped[int] = mapped_column(Integer, index=True)
+    pitch: Mapped[str] = mapped_column(Text)
+    signals: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    concerns: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIM))
+    embed_model: Mapped[str | None] = mapped_column(Text)
+    computed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class SimilarResult(Base):
+    """A cached "similar homes" answer: the reranked list and its reasons, keyed by the request.
+
+    `request_hash` covers the persona, the filters, the steering text and the prompt
+    version. Rows older than `app.similar.service.CACHE_TTL` are recomputed.
+    """
+
+    __tablename__ = "similar_results"
+
+    listing_id: Mapped[str] = mapped_column(
+        String(32), ForeignKey("listings.id", ondelete="CASCADE"), primary_key=True
+    )
+    request_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    model: Mapped[str] = mapped_column(Text)
+    result: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
     )

@@ -15,8 +15,10 @@ from app.lot import floorplan
 from app.lot import service as lot_service
 from app.lot.floorplan import FloorPlanResult
 from app.lot.schemas import LotAnalysis
-from app.models import Listing, ListingCityData, ListingInvestment
+from app.models import Listing, ListingCityData, ListingInvestment, ListingPersonaProfile
 from app.photos import reader as photo_reader
+from app.similar import profile as house_profile
+from app.similar import service as similar_service
 from app.schemas import (
     CityData,
     Facets,
@@ -56,7 +58,7 @@ SORTS = {
     "price_asc": Listing.price.asc(),
     "price_desc": Listing.price.desc(),
 }
-Sort = Literal["newest", "price_asc", "price_desc", "cap_rate_desc", "cash_flow_desc", "yield_desc"]
+Sort = Literal["newest", "price_asc", "price_desc", "cap_rate_desc", "cash_flow_desc", "yield_desc", "fit"]
 
 
 def _cover(listing: Listing) -> str | None:
@@ -76,6 +78,21 @@ def _summary(listing: Listing, fin: Financing) -> ListingSummary:
 def _with_investment(stmt: Select) -> Select:
     """Every search joins the investment estimate so returns can be filtered and sorted in SQL."""
     return stmt.outerjoin(ListingInvestment, ListingInvestment.listing_id == Listing.id)
+
+
+def _persona_scores(session: Session, ids: list[str]) -> dict[str, dict[str, int]]:
+    """The 4 persona scores per listing, for the badges on the cards. One query per page."""
+    scores: dict[str, dict[str, int]] = {}
+    if not ids:
+        return scores
+    rows = session.execute(
+        select(ListingPersonaProfile.listing_id, ListingPersonaProfile.persona, ListingPersonaProfile.score).where(
+            ListingPersonaProfile.listing_id.in_(ids)
+        )
+    )
+    for listing_id, persona, score in rows:
+        scores.setdefault(listing_id, {})[persona] = score
+    return scores
 
 
 @app.get("/api/health")
@@ -145,21 +162,29 @@ def list_listings(
     filters: FiltersDep,
     fin: FinancingDep,
     sort: Sort = "newest",
+    persona: house_profile.Persona | None = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 24,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> ListingPage:
+    """Search. `sort=fit` orders by the house profile's score for `persona` (first-time buyer when not given)."""
     total = session.scalar(_with_investment(select(func.count()).select_from(Listing)).where(*filters)) or 0
-    order = SORTS.get(sort) if sort in SORTS else strategy.strategy_sort(sort, fin)
-    rows = session.scalars(
-        _with_investment(select(Listing))
-        .options(contains_eager(Listing.investment_estimate))
-        .where(*filters)
-        .order_by(order, Listing.id)
-        .limit(limit)
-        .offset(offset)
-    ).all()
+    stmt = _with_investment(select(Listing)).options(contains_eager(Listing.investment_estimate)).where(*filters)
+    if sort == "fit":
+        fit = persona or "first_time_buyer"
+        stmt = stmt.outerjoin(
+            ListingPersonaProfile,
+            (ListingPersonaProfile.listing_id == Listing.id) & (ListingPersonaProfile.persona == fit),
+        )
+        order = ListingPersonaProfile.score.desc().nulls_last()
+    else:
+        order = SORTS.get(sort) if sort in SORTS else strategy.strategy_sort(sort, fin)
+    rows = session.scalars(stmt.order_by(order, Listing.id).limit(limit).offset(offset)).all()
+    scores = _persona_scores(session, [r.id for r in rows])
     return ListingPage(
-        items=[_summary(r, fin) for r in rows], total=total, limit=limit, offset=offset
+        items=[_summary(r, fin).model_copy(update={"persona_scores": scores.get(r.id)}) for r in rows],
+        total=total,
+        limit=limit,
+        offset=offset,
     )
 
 
@@ -224,6 +249,7 @@ def get_listing(listing_id: str, session: SessionDep) -> ListingDetail:
         update={
             "cover_photo": _cover(listing),
             "investment": strategy.summary(listing.investment_estimate, listing.price, Financing()),
+            "persona_scores": _persona_scores(session, [listing.id]).get(listing.id),
         }
     )
 
@@ -364,6 +390,51 @@ def post_listing_photos_review(listing_id: str, session: SessionDep) -> photo_re
     except zoning_answer.ModelUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     return photo_reader.labels_for(session, listing)
+
+
+@app.get("/api/listings/{listing_id}/profile")
+def get_listing_profile(listing_id: str, session: SessionDep) -> house_profile.ListingProfileOut:
+    """The stored house profile: the facts and the 4 persona views. Never calls the model."""
+    listing = session.get(Listing, listing_id)
+    if listing is None:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    return house_profile.profile_for(session, listing)
+
+
+@app.post("/api/listings/{listing_id}/profile")
+def post_listing_profile(listing_id: str, session: SessionDep, force: bool = False) -> house_profile.ListingProfileOut:
+    """Write the house profile with the model and embed the 4 pitches.
+
+    One call for the facts and the 4 persona views, then one embedding call. A profile
+    written with the current prompt is kept unless `force`. Without LLM_API_KEY this is a 503.
+    """
+    listing = session.get(Listing, listing_id)
+    if listing is None:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    try:
+        return house_profile.write_profile(session, listing, force=force)
+    except zoning_answer.ModelUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.get("/api/listings/{listing_id}/similar")
+def get_listing_similar(
+    listing_id: str,
+    session: SessionDep,
+    persona: house_profile.Persona = "first_time_buyer",
+    limit: Annotated[int, Query(ge=1, le=similar_service.RESULTS)] = similar_service.RESULTS,
+    rerank: bool = True,
+) -> similar_service.SimilarHomes:
+    """Homes similar to this one for one persona: filters, nearest pitches, one reranked and explained list.
+
+    The rerank is one model call, cached for a day per candidate set. `rerank=false`
+    returns the nearest-neighbour order with reasons from the shared signals and never
+    calls the model. A listing without a profile gets an empty list and a `note`.
+    """
+    listing = session.get(Listing, listing_id)
+    if listing is None:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    return similar_service.similar(session, listing, persona, use_model=rerank, limit=limit)
 
 
 @app.get("/api/lot")

@@ -28,6 +28,9 @@ services:
       LLM_PROVIDER: ${LLM_PROVIDER:-auto}
       LLM_BASE_URL: ${LLM_BASE_URL:-}
       ZONING_MODEL: ${ZONING_MODEL:-}
+      PHOTO_MODEL: ${PHOTO_MODEL:-}
+      PROFILE_MODEL: ${PROFILE_MODEL:-}
+      EMBED_MODEL: ${EMBED_MODEL:-}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:

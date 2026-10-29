@@ -109,7 +109,7 @@ the note that this is a photograph; a second `floor_plan` becomes `other`.
 
 | Provider | Default vision model |
 |---|---|
-| OpenRouter (`sk-or-`) | `nvidia/nemotron-3.5-super-vl` |
+| OpenRouter (`sk-or-`) | `nvidia/nemotron-3.5-super-vl:free` (the free listing of the same model) |
 | NVIDIA NIM (`nvapi-`) | `nvidia/nemotron-3.5-super-vl` |
 | Anthropic (`sk-ant-`) | `claude-opus-5-5` |
 
