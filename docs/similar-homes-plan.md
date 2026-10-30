@@ -211,10 +211,10 @@ Each gate is a check a person does by hand before the next phase starts. Duratio
 
 **Phase 4: Session taste. About 1 week.**
 
-- [ ] Session store for opens, saves, and dismissals without login
-- [ ] Taste summary call after every 5 actions, with a persona guess and confidence
-- [ ] Default toggle set from the guess above 0.7 confidence
-- [ ] Live metric: share of sessions that save a house reached through the similar row
+- [x] Session store for opens, saves, and dismissals without login (httpOnly cookie, `session_events`)
+- [x] Taste summary call after every 5 actions, with a persona guess and confidence (`session_taste`)
+- [x] Default toggle set from the guess above 0.7 confidence (search, listing and similar pages, with a "Set for you" line)
+- [x] Live metric: share of sessions that save a house reached through the similar row (`GET /api/metrics/similar`)
 
 ## Evaluation
 

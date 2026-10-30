@@ -1,5 +1,8 @@
 import Link from "next/link";
 
+import { ChevronLeftIcon, ChevronRightIcon, ListIcon, MapIcon } from "./icons";
+import { button } from "./ui";
+
 /** Links that keep every current search parameter and change one thing: the view or the page. */
 
 function href(basePath: string, params: URLSearchParams): string {
@@ -15,15 +18,17 @@ export function ViewToggle({ basePath, params, mapView }: { basePath: string; pa
     else next.delete("view");
     return href(basePath, next);
   };
-  const base = "px-3 py-1.5 text-sm transition-colors";
-  const on = "bg-accent text-accent-foreground";
-  const off = "text-muted hover:text-foreground";
+  const base = "inline-flex h-10 cursor-pointer items-center gap-1.5 px-3.5 text-sm font-medium transition-colors duration-200";
+  const on = "bg-foreground text-background";
+  const off = "text-muted hover:bg-surface-2 hover:text-foreground";
   return (
     <nav className="flex overflow-hidden rounded-lg border border-border bg-surface" aria-label="View">
       <Link href={to("list")} className={`${base} ${mapView ? off : on}`} aria-current={mapView ? undefined : "page"}>
+        <ListIcon className="size-4" />
         List
       </Link>
       <Link href={to("map")} className={`${base} ${mapView ? on : off}`} aria-current={mapView ? "page" : undefined}>
+        <MapIcon className="size-4" />
         Map
       </Link>
     </nav>
@@ -47,26 +52,34 @@ export function Pagination({
     next.set("page", String(p));
     return href(basePath, next);
   };
-  const linkClass = "rounded-lg border border-border bg-surface px-4 py-2 text-sm hover:border-accent";
+  const disabled = `${button.secondary} pointer-events-none opacity-40`;
 
   return (
-    <nav className="flex items-center justify-center gap-3 pt-2" aria-label="Pagination">
+    <nav className="flex items-center justify-center gap-3 pt-4" aria-label="Pagination">
       {page > 1 ? (
-        <Link href={to(page - 1)} className={linkClass}>
+        <Link href={to(page - 1)} className={button.secondary} rel="prev">
+          <ChevronLeftIcon className="size-4" />
           Previous
         </Link>
       ) : (
-        <span className={`${linkClass} pointer-events-none opacity-40`}>Previous</span>
+        <span className={disabled} aria-disabled="true">
+          <ChevronLeftIcon className="size-4" />
+          Previous
+        </span>
       )}
-      <span className="text-sm tabular-nums text-muted">
+      <span className="px-2 text-sm tabular-nums text-muted">
         Page {page} of {pageCount}
       </span>
       {page < pageCount ? (
-        <Link href={to(page + 1)} className={linkClass}>
+        <Link href={to(page + 1)} className={button.secondary} rel="next">
           Next
+          <ChevronRightIcon className="size-4" />
         </Link>
       ) : (
-        <span className={`${linkClass} pointer-events-none opacity-40`}>Next</span>
+        <span className={disabled} aria-disabled="true">
+          Next
+          <ChevronRightIcon className="size-4" />
+        </span>
       )}
     </nav>
   );

@@ -2,6 +2,7 @@ import { getLotAnalysis, type CityData, type LotAnalysis } from "@/lib/api";
 import { formatArea } from "@/lib/format";
 import { LotMap } from "./lot-map";
 import { LotSceneLoader } from "./lot-scene-loader";
+import { Help } from "../../ui";
 
 /**
  * The lot drawing. Shows the house and garage footprints, front lot line and rear
@@ -61,11 +62,13 @@ export async function LotSceneSection({ id, city }: { id: string; city: CityData
             </Legend>
           ) : null}
         </ul>
-        <p>
-          Heights from the city&apos;s LiDAR survey.
-          {limit ? " The height limit is drawn over the whole lot; setbacks are not." : ""} Drag to rotate, Ctrl +
-          scroll to zoom.
-        </p>
+        <div className="flex flex-wrap items-center gap-x-3">
+          <span>Drag to rotate, Ctrl + scroll to zoom.</span>
+          <Help label="About the 3D view">
+            Building heights come from the city&apos;s LiDAR survey.
+            {limit ? " The height limit is drawn over the whole lot; setbacks are not." : ""}
+          </Help>
+        </div>
       </div>
     </div>
   );
@@ -104,7 +107,7 @@ export async function CoverageFacts({ id, divider = true }: { id: string; divide
       <div className="flex items-baseline justify-between gap-4">
         <p className="text-sm text-muted">Lot coverage</p>
         <p className="text-sm tabular-nums">
-          <span className="text-2xl font-semibold">{coverage.coverage_pct}%</span>
+          <span className="display text-2xl font-semibold">{coverage.coverage_pct}%</span>
           <span className="text-muted">{allowed != null ? ` of ${allowed}% allowed` : " built on"}</span>
         </p>
       </div>
@@ -124,11 +127,13 @@ export async function CoverageFacts({ id, divider = true }: { id: string; divide
           />
         )}
       </dl>
-      <p className="text-xs text-muted">
-        Footprints from the city&apos;s building outlines, which miss driveways, patios and pools. Open land is not
-        necessarily green.
-      </p>
-      <Caveats caveats={caveats} />
+      <div className="text-xs text-muted">
+        <Help label="How coverage is measured">
+          Footprints come from the city&apos;s building outlines, which miss driveways, patios and pools. Open land is
+          not necessarily green.
+          <Caveats caveats={caveats} />
+        </Help>
+      </div>
     </div>
   );
 }
@@ -153,7 +158,7 @@ function Fact({ label, value }: { label: string; value: string | null }) {
   if (!value) return null;
   return (
     <div>
-      <dt className="text-muted">{label}</dt>
+      <dt className="text-xs text-muted">{label}</dt>
       <dd className="font-medium tabular-nums">{value}</dd>
     </div>
   );
@@ -166,7 +171,7 @@ function Caveats({ caveats }: { caveats: LotAnalysis["caveats"] }) {
   const specific = caveats.slice(0, Math.max(0, caveats.length - GENERIC_CAVEATS));
   if (specific.length === 0) return null;
   return (
-    <ul className="space-y-1 rounded-lg bg-background p-3 text-xs leading-relaxed text-muted">
+    <ul className="mt-2 list-disc space-y-1 pl-4">
       {specific.map((caveat) => (
         <li key={caveat}>{caveat}</li>
       ))}

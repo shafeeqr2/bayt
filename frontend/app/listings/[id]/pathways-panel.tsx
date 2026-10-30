@@ -20,6 +20,7 @@ import {
   type PathwayAnalysis,
   type Project,
 } from "@/lib/zoning";
+import { button, card, Chip, control, Help, SectionHeader } from "../../ui";
 import { OutcomeLabel, SummaryChips } from "./precedents-ui";
 import { TermCard, ZoningModel, buildScene } from "./zoning-model";
 
@@ -129,16 +130,15 @@ export function PathwaysPanel({ id }: { id: string }) {
   }
 
   return (
-    <section className="space-y-4">
-      <div className="space-y-1">
-        <h2 className="text-lg font-semibold">What could you build here?</h2>
-        <p className="text-sm text-muted">
-          Describe the plan. The analysis compares it with Zoning By-law 569-2013 for this lot and lists the public
-          routes that address each shortfall, with their risks. No prediction and no legal advice.
-        </p>
-      </div>
+    <section id="build" className="scroll-mt-28 space-y-5">
+      <SectionHeader
+        eyebrow="Zoning check"
+        title="What could you build here?"
+        lead="Describe the plan. The answer cites the by-law."
+        help="The analysis compares the plan with Zoning By-law 569-2013 for this lot and lists the public routes that address each shortfall, with their risks. Say what you know; the answer says what it still needs. A detail typed in the fields wins over the text. No prediction and no legal advice."
+      />
 
-      <form onSubmit={submit} className="space-y-4 rounded-xl border border-border bg-surface p-5">
+      <form onSubmit={submit} className={`space-y-4 p-5 ${card}`}>
         <div className="flex flex-wrap items-end justify-between gap-4">
           <Field label="I am">
             <Segmented
@@ -154,7 +154,7 @@ export function PathwaysPanel({ id }: { id: string }) {
             type="button"
             onClick={() => setShowDetails((v) => !v)}
             aria-expanded={showDetails}
-            className="rounded-lg border border-border px-3 py-1.5 text-sm text-muted hover:text-foreground"
+            className={button.secondary}
           >
             {showDetails ? "Hide the details" : "Give the details"}
           </button>
@@ -167,7 +167,7 @@ export function PathwaysPanel({ id }: { id: string }) {
             rows={3}
             maxLength={2000}
             placeholder="e.g. Keep the house and add a third storey, about 10.5 m high, and push the back wall out so the rear yard is 6.5 m."
-            className={`${control} resize-y leading-relaxed`}
+            className={`${control} h-auto resize-y py-2 leading-relaxed`}
           />
         </label>
         {showDetails && (
@@ -205,27 +205,21 @@ export function PathwaysPanel({ id }: { id: string }) {
             </Field>
           ))}
         </div>
-        <p className="text-xs text-muted">A detail you type here wins over what the text says.</p>
         </div>
         )}
         <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="submit"
-            disabled={busy}
-            className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground disabled:opacity-60"
-          >
+          <button type="submit" disabled={busy} className={button.primary} title="Say what you know. The answer says what it still needs.">
             {busy ? "Checking the by-law…" : "Check the zoning"}
           </button>
-          <p className="text-xs text-muted">Say what you know. The answer says what it still needs.</p>
         </div>
-        {error && <p className="text-sm text-accent">{error}</p>}
+        {error && <p className="text-sm text-danger">{error}</p>}
       </form>
 
       {result && (
         <>
           <Understood result={result} />
           {result.answer ? <WrittenAnswer answer={result.answer} /> : result.answer_note && (
-            <p className="rounded-lg bg-background p-3 text-xs leading-relaxed text-muted">{result.answer_note}</p>
+            <p className="rounded-lg bg-surface-2 p-3 text-xs leading-relaxed text-muted">{result.answer_note}</p>
           )}
           <Results result={result.analysis} />
         </>
@@ -259,7 +253,7 @@ function Citation({ id }: { id: string }) {
   const value = rest.join(":");
   const label = CITATION_LABELS[kind] ?? kind;
   return (
-    <span className="mr-1 inline-block rounded bg-border px-1.5 py-0.5 font-mono text-[10px] text-muted" title={id}>
+    <span className="mr-1 inline-block rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] text-muted" title={id}>
       {label} {value.replace(/-/g, " ")}
     </span>
   );
@@ -268,7 +262,7 @@ function Citation({ id }: { id: string }) {
 /** The model's written answer. Every paragraph passed the citation check on the server. */
 function WrittenAnswer({ answer }: { answer: Answer }) {
   return (
-    <div className="space-y-4 rounded-xl border border-border bg-surface p-5">
+    <div className={`space-y-4 p-5 ${card}`}>
       <p className="text-base font-medium leading-snug">{answer.headline}</p>
       {answer.sections.map((section) => (
         <div key={section.heading} className="space-y-2">
@@ -287,17 +281,16 @@ function WrittenAnswer({ answer }: { answer: Answer }) {
       ))}
       {answer.unknowns.length > 0 && <List title="Still unknown" items={answer.unknowns} />}
       {answer.questions.length > 0 && <List title="Ask next" items={answer.questions} />}
-      <p className="text-xs text-muted">
-        Written by {answer.model} from the analysis below. Every paragraph cites a route, a by-law clause, a standard or a
-        nearby file; paragraphs that cited nothing in the analysis were removed
-        {answer.dropped.length > 0 && ` (${answer.dropped.length} removed)`}.
-      </p>
+      <div className="text-xs text-muted">
+        <Help label={`Written by ${answer.model}`}>
+          Written from the analysis below. Every paragraph cites a route, a by-law clause, a standard or a nearby file;
+          paragraphs that cited nothing in the analysis were removed
+          {answer.dropped.length > 0 && ` (${answer.dropped.length} removed)`}.
+        </Help>
+      </div>
     </div>
   );
 }
-
-const control =
-  "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm tabular-nums focus:border-accent focus:outline-none";
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
@@ -319,7 +312,7 @@ function Segmented({
   options: [string, string][];
 }) {
   return (
-    <div className="inline-flex rounded-lg border border-border bg-background p-0.5" role="radiogroup">
+    <div className="inline-flex rounded-lg border border-border bg-surface-2 p-0.5" role="radiogroup">
       {options.map(([v, label]) => (
         <button
           key={v}
@@ -327,7 +320,7 @@ function Segmented({
           role="radio"
           aria-checked={value === v}
           onClick={() => onChange(v)}
-          className={`rounded-md px-3 py-1.5 text-sm ${value === v ? "bg-surface font-medium shadow-sm" : "text-muted"}`}
+          className={`cursor-pointer rounded-md px-3 py-1.5 text-sm transition-colors duration-200 ${value === v ? "bg-surface font-medium shadow-sm" : "text-muted hover:text-foreground"}`}
         >
           {label}
         </button>
@@ -379,8 +372,8 @@ function Results({ result }: { result: PathwayAnalysis }) {
           </div>
         ) : (
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_18rem]">
-            <div className="overflow-x-auto rounded-xl border border-border bg-surface">
-              <table className="w-full text-sm">
+            <div className={`overflow-x-auto ${card}`}>
+              <table className="w-full min-w-[40rem] text-sm">
                 <thead className="text-left text-muted">
                   <tr className="border-b border-border">
                     <th className="px-4 py-2 font-medium">Standard</th>
@@ -433,11 +426,15 @@ function Results({ result }: { result: PathwayAnalysis }) {
       </div>
 
       {result.caveats.length > 0 && (
-        <ul className="space-y-1 rounded-lg bg-background p-3 text-xs leading-relaxed text-muted">
-          {result.caveats.map((caveat) => (
-            <li key={caveat}>{caveat}</li>
-          ))}
-        </ul>
+        <div className="text-xs text-muted">
+          <Help label="Caveats">
+            <ul className="list-disc space-y-1 pl-4">
+              {result.caveats.map((caveat) => (
+                <li key={caveat}>{caveat}</li>
+              ))}
+            </ul>
+          </Help>
+        </div>
       )}
       <p className="text-xs leading-relaxed text-muted">{result.disclaimer}</p>
     </div>
@@ -445,10 +442,10 @@ function Results({ result }: { result: PathwayAnalysis }) {
 }
 
 const STATUS: Record<Gap["status"], [string, string]> = {
-  complies: ["Complies", "bg-emerald-600/15 text-emerald-700 dark:text-emerald-300"],
-  short: ["Short", "bg-accent/15 text-accent"],
-  unknown: ["Unknown", "bg-border text-muted"],
-  not_applicable: ["No limit", "bg-border text-muted"],
+  complies: ["Complies", "bg-success/12 text-success"],
+  short: ["Short", "bg-danger-soft text-danger"],
+  unknown: ["Unknown", "bg-surface-2 text-muted"],
+  not_applicable: ["No limit", "bg-surface-2 text-muted"],
 };
 
 function num(value: number | null, unit: string): string {
@@ -477,7 +474,7 @@ function GapRow({
     gap.proposed_source === "existing" ? " (as today)" : gap.proposed_source === "derived" ? " (calculated)" : "";
   return (
     <tr
-      className={`cursor-pointer border-b border-border align-top last:border-0 ${active ? "bg-background" : ""}`}
+      className={`cursor-pointer border-b border-border align-top transition-colors duration-200 last:border-0 ${active ? "bg-surface-2" : ""}`}
       onPointerEnter={() => onHover(gap.standard)}
       onPointerLeave={() => onHover(null)}
       onClick={onPin}
@@ -507,7 +504,7 @@ function GapRow({
       </td>
       <td className="px-4 py-2 tabular-nums">
         {num(gap.existing, gap.unit)}
-        {gap.existing_status === "short" && <span className="ml-1 text-xs text-accent">short today</span>}
+        {gap.existing_status === "short" && <span className="ml-1 text-xs text-danger">short today</span>}
       </td>
       <td className="px-4 py-2">
         <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${tone}`}>{label}</span>
@@ -523,12 +520,12 @@ function CandidateCard({ c, mode }: { c: Candidate; mode: Mode }) {
   const constraint = c.category === "constraint";
   const needs = c.missing_facts.map((f) => FACT_LABELS[f] ?? f.replace(/^gap\./, "").replace(/[._]/g, " "));
   return (
-    <li className={`rounded-xl border bg-surface p-5 ${constraint ? "border-accent/60" : "border-border"}`}>
+    <li className={`${card} p-5 ${constraint ? "border-danger/50" : ""}`}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="space-y-1">
           <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="rounded-full bg-border px-2 py-0.5 font-medium">{CATEGORY_LABELS[c.category] ?? c.category}</span>
-            <span className={c.result === "applies" ? "text-emerald-700 dark:text-emerald-300" : "text-muted"}>
+            <Chip tone="neutral">{CATEGORY_LABELS[c.category] ?? c.category}</Chip>
+            <span className={c.result === "applies" ? "text-success" : "text-muted"}>
               {c.result === "applies" ? "Applies to this plan" : `May apply, needs ${needs.join(", ")}`}
             </span>
           </div>
@@ -591,7 +588,7 @@ function Comparable({ p }: { p: CardPrecedents }) {
     return <p className="mt-3 text-xs text-muted">No comparable file nearby ({what}).</p>;
   }
   return (
-    <div className="mt-3 space-y-2 rounded-lg bg-background p-3">
+    <div className="mt-3 space-y-2 rounded-lg bg-surface-2 p-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="text-xs font-medium text-muted">
           Nearby decisions on comparable files <span className="font-normal">({what})</span>
@@ -626,7 +623,7 @@ function List({ title, items, ordered, tone }: { title: string; items: string[];
   const Tag = ordered ? "ol" : "ul";
   return (
     <div>
-      <p className={`text-xs font-medium ${tone === "risk" ? "text-accent" : "text-muted"}`}>{title}</p>
+      <p className={`text-xs font-medium ${tone === "risk" ? "text-danger" : "text-muted"}`}>{title}</p>
       <Tag className={`mt-1 space-y-1 text-sm leading-relaxed ${ordered ? "list-decimal" : "list-disc"} pl-4`}>
         {items.map((item) => (
           <li key={item}>{item}</li>

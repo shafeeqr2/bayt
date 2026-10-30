@@ -1,4 +1,5 @@
 import type { Potential } from "@/lib/api";
+import { Chip } from "./ui";
 
 /** The ways a buyer could add value, as small chips. Used on search cards and the listing page. */
 export function PotentialChips({ potential, max }: { potential: Potential[]; max?: number }) {
@@ -8,16 +9,16 @@ export function PotentialChips({ potential, max }: { potential: Potential[]; max
   return (
     <ul className="flex flex-wrap gap-1.5" aria-label="Ways to add value">
       {shown.map((p) => (
-        <li
-          key={p.key}
-          title={p.detail}
-          className="rounded-full border border-accent/30 bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent"
-        >
-          {p.label}
+        <li key={p.key}>
+          <Chip title={p.detail}>{p.label}</Chip>
         </li>
       ))}
       {extra > 0 && (
-        <li className="rounded-full border border-border px-2 py-0.5 text-xs text-muted">+{extra}</li>
+        <li>
+          <Chip tone="neutral" title={potential.slice(shown.length).map((p) => p.label).join(", ")}>
+            +{extra}
+          </Chip>
+        </li>
       )}
     </ul>
   );

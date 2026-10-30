@@ -240,20 +240,20 @@ function path(points: Vec[], c: Camera): string {
 // -- colours ------------------------------------------------------------------
 
 const STROKE: Record<Status, string> = {
-  complies: "stroke-emerald-600 dark:stroke-emerald-400",
-  short: "stroke-accent",
+  complies: "stroke-success",
+  short: "stroke-danger",
   unknown: "stroke-muted",
   not_applicable: "stroke-muted",
 };
 const FILL: Record<Status, string> = {
-  complies: "fill-emerald-600/15 dark:fill-emerald-400/15",
-  short: "fill-accent/20",
+  complies: "fill-success/15",
+  short: "fill-danger/20",
   unknown: "fill-muted/10",
   not_applicable: "fill-transparent",
 };
 const TEXT: Record<Status, string> = {
-  complies: "fill-emerald-700 dark:fill-emerald-300",
-  short: "fill-accent",
+  complies: "fill-success",
+  short: "fill-danger",
   unknown: "fill-muted",
   not_applicable: "fill-muted",
 };
@@ -345,7 +345,7 @@ export function ZoningModel({ analysis, active, onHover, onPin }: ZoningModelPro
 
   return (
     <div className="space-y-2">
-      <div className="relative overflow-hidden rounded-xl border border-border bg-background">
+      <div className="relative overflow-hidden rounded-card border border-border bg-surface-2">
         <svg
           viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
           className="block h-auto w-full cursor-grab touch-none select-none active:cursor-grabbing"
@@ -479,8 +479,8 @@ export function ZoningModel({ analysis, active, onHover, onPin }: ZoningModelPro
       </div>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs text-muted">
         <ul className="flex flex-wrap gap-x-3 gap-y-1">
-          <Swatch className="bg-emerald-600 dark:bg-emerald-400">Fits the by-law</Swatch>
-          <Swatch className="bg-accent">Short</Swatch>
+          <Swatch className="bg-success">Fits the by-law</Swatch>
+          <Swatch className="bg-danger">Short</Swatch>
           <Swatch className="border border-dashed border-muted">Unknown</Swatch>
           <Swatch className="border border-dashed border-[#2563eb] bg-[#2563eb]/10 dark:border-[#60a5fa]">The most the by-law allows</Swatch>
           <Swatch className="bg-foreground/15 outline outline-1 outline-foreground/60">Your plan</Swatch>
@@ -510,8 +510,8 @@ export function ZoningModel({ analysis, active, onHover, onPin }: ZoningModelPro
 }
 
 function badgeTone(status: Status): string {
-  if (status === "complies") return "border-emerald-600/40 bg-emerald-600/10 text-emerald-700 dark:text-emerald-300";
-  if (status === "short") return "border-accent/50 bg-accent/10 text-accent";
+  if (status === "complies") return "border-success/40 bg-success/10 text-success";
+  if (status === "short") return "border-danger/50 bg-danger-soft text-danger";
   return "border-dashed border-muted text-muted";
 }
 
@@ -554,7 +554,7 @@ function Swatch({ className, children }: { className: string; children: React.Re
 export function TermCard({ gap, scene }: { gap: Gap | null; scene?: Scene }) {
   if (!gap) {
     return (
-      <div className="rounded-xl border border-border bg-surface p-4 text-sm text-muted">
+      <div className="rounded-card border border-border bg-surface p-4 text-sm text-muted shadow-card">
         <p className="font-medium text-foreground">What the lines mean</p>
         <p className="mt-1 leading-relaxed">
           Each line is 1 rule of the by-law, drawn where it is measured. Hover or tap a line, a badge or a row of the table to
@@ -581,7 +581,7 @@ export function TermCard({ gap, scene }: { gap: Gap | null; scene?: Scene }) {
               ? "Not given. Add it to the details to have it checked."
               : "The by-law value for this lot is not known.";
   return (
-    <div className="space-y-3 rounded-xl border border-border bg-surface p-4 text-sm">
+    <div className="space-y-3 rounded-card border border-border bg-surface p-4 text-sm shadow-card">
       <div>
         <p className="font-medium">{term?.name ?? gap.label}</p>
         <p className="text-xs text-muted">{gap.label}</p>
@@ -598,7 +598,7 @@ export function TermCard({ gap, scene }: { gap: Gap | null; scene?: Scene }) {
         <Num label="Your plan" value={fmt(gap.proposed, gap.unit)} hint={gap.proposed_source === "existing" ? "as today" : gap.proposed_source === "derived" ? "calculated" : undefined} />
         <Num label="Today" value={fmt(gap.existing, gap.unit)} hint={gap.existing_status === "short" ? "short today" : undefined} />
       </dl>
-      <p className={gap.status === "short" ? "text-accent" : gap.status === "complies" ? "text-emerald-700 dark:text-emerald-300" : "text-muted"}>{verdict}</p>
+      <p className={gap.status === "short" ? "text-danger" : gap.status === "complies" ? "text-success" : "text-muted"}>{verdict}</p>
       {measure?.placeholder != null && (
         <p className="text-xs text-muted">Drawn at {fmt(measure.placeholder, gap.unit)} as a placeholder.</p>
       )}

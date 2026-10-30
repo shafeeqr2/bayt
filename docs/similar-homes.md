@@ -1,6 +1,6 @@
 # Similar homes
 
-A buyer opens a listing and sees "Similar homes": 8 houses that are similar for the
+A buyer opens a listing and clicks "More like this" (a page per house, also reachable from the sparkle button on every tile): 8 houses that are similar for the
 reason this buyer cares about, with 1 line per house that says why. The same house
 appeals to a first-time buyer, an investor, a flipper and a builder for different
 reasons, so "similar" is computed 4 times, once per persona, and the buyer picks
@@ -148,3 +148,33 @@ tiers, the rewrite scrub and the retry rule.
 
 Gate 1 of the plan (50 profiles read by hand, rubric fixed) and gate 2 (100 pair
 judgments, 70% agreement with the top 5) are not done yet.
+
+## Session taste (phase 4)
+
+No login. The first page view sets an httpOnly cookie `bayt_sid` (32 hex, 1 year,
+SameSite lax) from a Next route; the browser never sees the backend. Every open,
+save, unsave and dismiss posts one event through `/api/session/events` to
+`POST /api/session/{sid}/events`, stored in `session_events` with how the visitor
+reached the house (`via`: similar, search, direct, saved) and the buyer in view.
+
+**The summary.** After every 5th event the backend makes 1 structured call to the
+text model (`nvidia/nemotron-3-super-120b-a12b` on Token Factory) with the last 20
+events, each with the house's facts, its 4 persona scores and the best persona's
+pitch. The answer is 1 or 2 sentences addressed to "you", a persona guess, a
+confidence from 0 to 1 and 3 to 5 "likes", stored in `session_taste`. The call
+releases the database connection first, like the floor plan hints. Failures are
+stored in `note` and never reach the visitor.
+
+**The default buyer.** `GET /api/session/{sid}` returns the saves, the taste and
+`default_persona`: the guess when the confidence is 0.7 or more, else null. The
+search, listing and similar pages use it when the URL names no buyer, and show one
+line, "Set for you: Investor, from what you have opened and saved", with links to
+change it. A buyer in the URL always wins.
+
+**Saved.** `/saved` lists the saved homes (save minus a later unsave) and the taste
+card. The heart sits on every tile; "Not for me" on the similar rows and the
+listing page.
+
+**The metric.** `GET /api/metrics/similar`: of the sessions with at least 1 save,
+the share whose saved house was first opened from the similar page in that session.
+Pure replay of the event table; no UI.

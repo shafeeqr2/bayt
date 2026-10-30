@@ -1,4 +1,5 @@
 import { getFloorPlan, type FloorPlan, type PlanLevel, type PlanRoom } from "@/lib/api";
+import { card, Help, Section } from "../../ui";
 
 const MAX_W = 300;
 const MAX_H = 340;
@@ -17,17 +18,19 @@ export async function FloorPlanSection({ id }: { id: string }) {
   const { plan, reason } = result;
 
   return (
-    <section className="space-y-3">
-      <div className="space-y-1">
-        <h2 className="text-lg font-semibold">Possible layout</h2>
-        <p className="text-sm text-muted">
-          {plan
-            ? "The listed rooms fitted into the city's building outline. The listing has no floor plan, so room positions are a best guess and the real layout will differ."
-            : reason}
-        </p>
-      </div>
+    <Section
+      id="layout"
+      eyebrow="From the listed rooms"
+      title="Possible layout"
+      lead={plan ? "Rooms fitted into the city's building outline; a best guess, not a plan." : reason}
+      help={
+        plan
+          ? "The listing has no floor plan. Each listed room is placed inside the building outline from the city's GIS, so positions, doors and hallways are guesses and the real layout will differ."
+          : undefined
+      }
+    >
       {plan && <Plan plan={plan} />}
-    </section>
+    </Section>
   );
 }
 
@@ -42,11 +45,15 @@ function Plan({ plan }: { plan: FloorPlan }) {
         ))}
       </div>
       {plan.notes.length > 0 && (
-        <ul className="list-disc space-y-1 pl-5 text-xs text-muted">
-          {plan.notes.map((note) => (
-            <li key={note}>{note}</li>
-          ))}
-        </ul>
+        <div className="text-sm text-muted">
+          <Help label="Assumptions">
+            <ul className="list-disc space-y-1 pl-5">
+              {plan.notes.map((note) => (
+                <li key={note}>{note}</li>
+              ))}
+            </ul>
+          </Help>
+        </div>
       )}
     </div>
   );
@@ -60,7 +67,7 @@ function Legend() {
         <span className={`${swatch} border-foreground/50 bg-surface`} /> Listed room
       </span>
       <span>
-        <span className={`${swatch} border-dashed border-muted bg-background`} /> Assumed: stairs, bathrooms, garage
+        <span className={`${swatch} border-dashed border-muted bg-background`} /> Assumed: stairs, bathrooms, garage, rooms read from the text and photos
       </span>
       <span>
         <span className={`${swatch} border-foreground/50 bg-border`} /> Halls, closets and walls
@@ -85,9 +92,9 @@ function LevelCard({ level, plan, scale }: { level: PlanLevel; plan: FloorPlan; 
   const streetY = PAD + plan.depth_m * scale + 8;
 
   return (
-    <figure className="space-y-2 rounded-xl border border-border bg-surface p-4">
+    <figure className={`space-y-3 p-5 ${card}`}>
       <figcaption className="flex items-baseline justify-between gap-3">
-        <span className="text-sm font-semibold">{level.name}</span>
+        <h3 className="text-sm font-semibold">{level.name}</h3>
         <span className="text-xs tabular-nums text-muted">
           Rooms {Math.round(level.listed_area_m2)} m² of {Math.round(level.floor_area_m2)} m²
         </span>
@@ -133,7 +140,8 @@ function Room({ room, x, y, w, h, scale }: { room: PlanRoom; x: number; y: numbe
     room.name,
     room.size ? `${room.size} as listed` : null,
     room.scale ? `drawn ${Math.round((1 - room.scale) * 100)}% smaller to fit` : null,
-    assumed ? "assumed, not in the listing" : "position is a guess",
+    room.note ?? (room.size_assumed ? "typical size, the listing gives none" : null),
+    assumed ? (room.note ? "drawn as assumed" : "assumed, not in the listing") : "position is a guess",
   ]
     .filter(Boolean)
     .join(", ");

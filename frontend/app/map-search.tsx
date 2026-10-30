@@ -313,7 +313,7 @@ export function MapSearch({ query, total }: { query: string; total: number }) {
 
   if (unsupported) {
     return (
-      <div className="flex h-40 items-center justify-center rounded-xl border border-border bg-surface p-4 text-center text-sm text-muted">
+      <div className="flex h-40 items-center justify-center rounded-2xl border border-border bg-surface p-4 text-center text-sm text-muted shadow-card">
         The map needs WebGL, which this browser has turned off. Switch to the list view.
       </div>
     );
@@ -321,7 +321,7 @@ export function MapSearch({ query, total }: { query: string; total: number }) {
   return (
     <div className="space-y-2">
       <div
-        className="relative h-[70vh] min-h-[28rem] w-full overflow-hidden rounded-xl border border-border bg-border"
+        className="relative h-[70vh] min-h-[28rem] w-full overflow-hidden rounded-2xl border border-border bg-border shadow-card"
         role="region"
         aria-label={`Map of ${total.toLocaleString("en-CA")} ${total === 1 ? "home" : "homes"}`}
       >
@@ -338,10 +338,7 @@ export function MapSearch({ query, total }: { query: string; total: number }) {
           </p>
         )}
       </div>
-      <p className="text-xs text-muted">
-        Buildings inside Toronto are the city&apos;s LiDAR survey, with measured heights; elsewhere they are
-        OpenStreetMap&apos;s. Click a cluster to zoom in, a pin for the home. Drag to pan, Ctrl + scroll to zoom.
-      </p>
+      <p className="text-xs text-muted">Click a cluster to zoom in and a pin to open the home. Ctrl + scroll zooms.</p>
     </div>
   );
 }

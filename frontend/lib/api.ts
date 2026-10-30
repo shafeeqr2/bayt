@@ -301,6 +301,10 @@ export type PlanRoom = {
   size: string | null;
   /** Drawn at this share of the listed size so it fits; null when full size. */
   scale: number | null;
+  /** True when the listing gives no size and a typical one is drawn. */
+  size_assumed?: boolean;
+  /** Where an assumed room comes from, e.g. "named in the description: '4th bedroom down'". */
+  note?: string | null;
 };
 
 export type PlanLevel = {
