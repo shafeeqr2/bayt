@@ -1,6 +1,6 @@
 # Bayt pitch video: narration script
 
-Voice: Kokoro-82M `am_michael`, speed 1.12, generated locally with `hyperframes tts`. One clip per scene; each scene lasts as long as its clip plus a short beat.
+Voice: Kokoro-82M `am_fenrir`, speed 1.15, generated locally with `hyperframes tts`. One clip per scene; each scene lasts as long as its clip plus a short beat.
 
 | # | Scene | Narration |
 |---|---|---|
