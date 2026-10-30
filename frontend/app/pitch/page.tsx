@@ -7,7 +7,7 @@ import { Chip, button, card } from "../ui";
 export const metadata: Metadata = {
   title: "Why Bayt",
   description:
-    "Real estate search powered by AI. Every Toronto listing read by NVIDIA Nemotron, scored for 4 kinds of buyer, and matched to homes like this.",
+    "Search by taste, not by filters. Bayt reads every Toronto listing the way a buyer would, then finds the homes you would love and says why.",
 };
 
 const LIVE = "https://bayt.andalsolutions.com";
@@ -41,9 +41,9 @@ export default function PitchPage() {
             <SparklesIcon className="size-3.5" />
             Nebius x NVIDIA Global AI Hackathon
           </Chip>
-          <h1 className="display text-4xl font-semibold leading-[1.05] sm:text-6xl">Real estate search powered by AI</h1>
+          <h1 className="display text-4xl font-semibold leading-[1.05] sm:text-6xl">Search by taste, not by filters.</h1>
           <p className="mx-auto max-w-2xl text-lg text-muted sm:text-xl">
-            Bayt reads every Toronto listing the way a buyer would. Then it finds the homes you would like, and says why.
+            Bayt reads every listing the way a buyer would, then finds the homes you would love and says why.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
             <a href={LIVE} className={`${button.primary} h-12 px-6 text-base`}>
@@ -68,7 +68,7 @@ export default function PitchPage() {
               Your browser cannot play this video. Open the live site instead.
             </video>
           </div>
-          <figcaption className="text-center text-sm text-muted">A walkthrough of the live site: search, “More like this”, steering, lot and zoning, and the Committee of Adjustment pipeline.</figcaption>
+          <figcaption className="text-center text-sm text-muted">A narrated walkthrough of the live site: Taste Match, Taste Profile, Precedent Check, Build Check and Floor Sketch.</figcaption>
         </figure>
       </section>
 
@@ -96,11 +96,11 @@ export default function PitchPage() {
       {/* How it works */}
       <section className="space-y-10">
         <div className="max-w-2xl space-y-3">
-          <p className="text-xs font-medium uppercase tracking-wider text-accent">How it works</p>
-          <h2 className="display text-3xl font-semibold sm:text-4xl">Inspired by the Netflix recommender</h2>
+          <p className="text-xs font-medium uppercase tracking-wider text-accent">Taste Match</p>
+          <h2 className="display text-3xl font-semibold sm:text-4xl">Built like the Netflix recommender</h2>
           <p className="text-lg text-muted">
-            Netflix moved from click data to a language model that reads what a title is about. Bayt does the same for
-            houses, with the reasons written down and the buyer at the wheel.
+            Netflix moved from click data to a language model that reads what a title is about. Taste Match does the
+            same for houses, with the reasons written down and the buyer at the wheel.
           </p>
         </div>
         <ol className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -129,11 +129,11 @@ export default function PitchPage() {
       {/* More like this and steering */}
       <section className="grid gap-10 lg:grid-cols-2 lg:gap-16">
         <div className="space-y-5">
-          <p className="text-xs font-medium uppercase tracking-wider text-accent">More like this</p>
+          <p className="text-xs font-medium uppercase tracking-wider text-accent">Taste Match, in use</p>
           <h2 className="display text-3xl font-semibold sm:text-4xl">Ranked for the buyer you are</h2>
           <p className="text-lg leading-relaxed text-muted">
-            Pick who you are. Bayt filters to the same price band within 5 km, finds the nearest pitches, and Nemotron
-            ranks the best 8. Every match carries 1 line on why it fits you.
+            Pick who you are and press More like this. Taste Match filters to the same price band within 5 km, finds the
+            nearest pitches, and Nemotron ranks the best 8. Every match carries 1 line on why it fits you.
           </p>
           <a href={DEMO} className={button.secondary}>
             See it on 39 Rhydwen Avenue
@@ -156,7 +156,7 @@ export default function PitchPage() {
             <p className="rounded-lg border border-border bg-background px-3 py-2.5 text-base text-muted">a bigger backyard and a garage</p>
             <p className="text-sm leading-relaxed text-muted">
               Type the change in words. Nemotron rewrites the pitch, the search runs again, and the reasons say how
-              each house meets the ask. Facet chips choose what counts: layout, finish, lot, location, money.
+              each house meets the ask. Save a few homes and your Taste Profile sets the default buyer, no login.
             </p>
           </div>
         </div>
@@ -165,16 +165,16 @@ export default function PitchPage() {
       {/* Builders and investors */}
       <section className="space-y-10">
         <div className="max-w-2xl space-y-3">
-          <p className="text-xs font-medium uppercase tracking-wider text-accent">For builders and investors</p>
+          <p className="text-xs font-medium uppercase tracking-wider text-accent">Precedent Check, Build Check, Floor Sketch</p>
           <h2 className="display text-3xl font-semibold sm:text-4xl">See the precedent before you buy</h2>
           <p className="text-lg text-muted">Every house page reads the City of Toronto’s open data for that lot.</p>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           <Feature title="Lot and zoning" body="Lot area, frontage, coverage against the cap, height limit, as-of-right units, garden suite potential. Drawn to scale, in 2D and 3D." />
-          <Feature title="What could you build here?" body="Describe the plan in words. The answer checks it against By-law 569-2013 and cites the clauses and the routes." />
+          <Feature title="Build Check" body="Describe the plan in words. The answer checks it against By-law 569-2013 and cites the clauses and the routes." />
           <Feature
-            title="Committee of Adjustment pipeline"
-            body="Every decision since 2001 within 500 m: what neighbours asked for and what the committee said."
+            title="Precedent Check"
+            body="Every Committee of Adjustment decision since 2001 within 500 m: what neighbours asked for and what the committee said. Precedent, not a promise."
             proof={
               <div className="flex flex-wrap gap-2 pt-1">
                 <Chip tone="neutral">222 files within 500 m</Chip>
@@ -183,7 +183,7 @@ export default function PitchPage() {
               </div>
             }
           />
-          <Feature title="Possible floor plan" body="The listed rooms fitted into the City’s building outline. Nemotron adds the rooms the description names but the table leaves out." />
+          <Feature title="Floor Sketch" body="The listed rooms fitted into the City’s building outline. Nemotron adds the rooms the description names but the table leaves out." />
         </div>
       </section>
 
@@ -226,7 +226,7 @@ export default function PitchPage() {
 
       {/* Close */}
       <section className="rounded-3xl bg-foreground px-6 py-14 text-center text-background sm:px-12">
-        <p className="display mx-auto max-w-2xl text-3xl font-semibold leading-tight sm:text-5xl">House search that knows why you like a house.</p>
+        <p className="display mx-auto max-w-2xl text-3xl font-semibold leading-tight sm:text-5xl">Bayt. Search by taste.</p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <a href={LIVE} className="inline-flex h-12 cursor-pointer items-center gap-2 rounded-lg bg-background px-6 text-base font-medium text-foreground transition-opacity duration-200 hover:opacity-90">
             Try it live
