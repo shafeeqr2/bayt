@@ -59,7 +59,7 @@ const MODELS: { name: string; id: string; nvidia: boolean; jobs: string; why: st
     id: "nvidia/nemotron-3-super-120b-a12b",
     nvidia: true,
     jobs: "Writes the Build Check answer with citations. Completes the room list for Floor Sketch. Writes the Taste Profile.",
-    why: "Strong reasoning over long by-law text at a low cost per token. Thinking switches off for fast structured answers and on for the cited zoning answers.",
+    why: "Strong reasoning over long by-law text at a low cost per token. Bayt runs it with thinking off, so even the cited zoning answer arrives in seconds.",
   },
   {
     name: "Qwen3-Embedding-8B",
