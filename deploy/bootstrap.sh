@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Prepare a fresh Ubuntu 24.04 server for Bayt. Run once, as root:
 #
-#   curl -fsSL https://raw.githubusercontent.com/kkamilahmed/bayt/main/deploy/bootstrap.sh \
+#   curl -fsSL https://raw.githubusercontent.com/shafeeqr2/bayt/main/deploy/bootstrap.sh \
 #     | sudo bash -s -- "ssh-ed25519 AAAA... you@laptop"
 #
 # The argument is the public SSH key for the `deploy` user (the key text or a file
@@ -9,7 +9,7 @@
 # safe: every step checks its own result first. See docs/deploy.md.
 set -euo pipefail
 
-REPO_URL="${REPO_URL:-https://github.com/kkamilahmed/bayt.git}"
+REPO_URL="${REPO_URL:-https://github.com/shafeeqr2/bayt.git}"
 APP_DIR=/opt/bayt
 DEPLOY_USER=deploy
 PUBKEY="${1:-}"

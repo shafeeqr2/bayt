@@ -18,7 +18,7 @@ Every model call runs on [Nebius Token Factory](https://tokenfactory.nebius.com)
 You need [Docker Desktop](https://www.docker.com/products/docker-desktop/) (running) and Node.js 20.9+ (24 recommended, see `frontend/.nvmrc`).
 
 ```bash
-git clone https://github.com/kkamilahmed/bayt.git
+git clone https://github.com/shafeeqr2/bayt.git
 cd bayt
 ./start.sh
 ```

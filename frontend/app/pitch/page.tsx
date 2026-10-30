@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 };
 
 const LIVE = "https://bayt.andalsolutions.com";
-const REPO = "https://github.com/kkamilahmed/bayt";
+const REPO = "https://github.com/shafeeqr2/bayt";
 const DEMO = `${LIVE}/listings/30365686/similar?persona=investor`;
 
 const STEPS: { n: string; title: string; body: string }[] = [

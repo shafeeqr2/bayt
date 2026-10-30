@@ -15,7 +15,7 @@ Nemotron, scored for 4 kinds of buyer, and matched to homes "like this, but..."
 ## Links
 
 - Demo: https://bayt.andalsolutions.com
-- Repository: https://github.com/kkamilahmed/bayt
+- Repository: https://github.com/shafeeqr2/bayt
 - Video: (YouTube link)
 
 ## Inspiration

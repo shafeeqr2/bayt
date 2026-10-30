@@ -36,7 +36,7 @@ It also sets `COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml`, so a pla
 Once, as root on a fresh droplet:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kkamilahmed/bayt/main/deploy/bootstrap.sh \
+curl -fsSL https://raw.githubusercontent.com/shafeeqr2/bayt/main/deploy/bootstrap.sh \
   | sudo bash -s -- "ssh-ed25519 AAAA... you@laptop"
 ```
 
