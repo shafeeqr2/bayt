@@ -30,7 +30,7 @@ import re
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -95,6 +95,15 @@ class PersonaView(BaseModel):
     )
     signals: list[str] = Field(description="3 to 6 short fact phrases that drove the score, e.g. 'legal basement apartment', '25 ft lot', 'kitchen renovated'")
     concerns: list[str] = Field(description="1 to 3 short fact phrases this persona would hold against the house; empty when none")
+
+    @field_validator("signals", "concerns", mode="before")
+    @classmethod
+    def _split_a_string(cls, value: Any) -> Any:
+        # Nemotron on Token Factory answers about 1 listing in 100 with one comma-separated
+        # string where the schema asks for a list. Split it instead of failing the listing.
+        if isinstance(value, str):
+            return [part.strip() for part in re.split(r"[;,]\s*|\n", value) if part.strip()]
+        return value
 
 
 class Profile(BaseModel):

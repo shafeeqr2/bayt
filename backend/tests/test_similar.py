@@ -246,3 +246,9 @@ def test_nebius_defaults_and_the_embedding_dimensions(monkeypatch):
 
     em.EmbeddingClient("v1.CmIx", "https://api.tokenfactory.nebius.com/v1", "Qwen/Qwen3-Embedding-8B", "nebius", transport=httpx.MockTransport(handler)).embed(["a"])
     assert seen["body"]["dimensions"] == em.EMBEDDING_DIM and "input_type" not in seen["body"]
+
+
+def test_persona_view_accepts_signals_as_one_string():
+    v = hp.PersonaView(score=7, pitch="p", signals="two kitchens, side entrance; 25 ft lot", concerns="")
+    assert v.signals == ["two kitchens", "side entrance", "25 ft lot"] and v.concerns == []
+    assert hp.PersonaView(score=7, pitch="p", signals=["a"], concerns=["b"]).signals == ["a"]
