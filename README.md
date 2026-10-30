@@ -8,8 +8,8 @@ See the [product brief](docs/product-brief.md) for goals, users, and features.
 Live, no login: **https://bayt.andalsolutions.com**
 
 1. On the search page set "I am a" to Investor and sort by "Best fit". Each card shows that buyer's score, 1 to 10.
-2. Open a house. Under the price, 4 chips score it for a first-time buyer, an investor, a flipper and a builder. Click one: "Similar homes" shows 8 houses ranked for that buyer with 1 reason each.
-3. In "Like this, but..." type `bigger backyard and a garage`. The matches and the reasons change. The chips under it choose what counts.
+2. Open a house. "Who this home suits" scores it for a first-time buyer, an investor, a flipper and a builder. Click **More like this**: a page with 8 houses ranked for that buyer, 1 reason each. Every tile also has a sparkle button that opens this page for that house.
+3. On that page, in "Like this, but…" type `bigger backyard and a garage`. The matches and the reasons change. The chips under it choose what counts.
 
 Every model call runs on [Nebius Token Factory](https://tokenfactory.nebius.com) with NVIDIA Nemotron; see "AI models" below. Design notes for the feature: [docs/similar-homes.md](docs/similar-homes.md).
 
@@ -58,6 +58,8 @@ Every model call in Bayt goes through [Nebius Token Factory](https://tokenfactor
 | Steering: rewrite the pitch for "like this, but bigger backyard" | `nvidia/Nemotron-3.5-Super-VL` | 1 per typed ask, cached 24 h |
 | Photo labels: a title, a sentence and floor-plan facts per photo | `nvidia/Nemotron-3.5-Super-VL` | 1 per listing with all photos |
 | Zoning answer: read the plan from plain words, write the cited answer | `nvidia/nemotron-3-super-120b-a12b` | 2 per new question, cached |
+| Room completion for the possible floor plan: rooms the description and photos name but the room table lacks | `nvidia/nemotron-3-super-120b-a12b` | 1 per listing, cached |
+| Session taste: what your opens and saves say about the buyer you are, with a persona guess | `nvidia/nemotron-3-super-120b-a12b` | 1 per 5 actions, no login |
 | Pitch embeddings for the nearest-neighbour search (pgvector, 2,048 dims) | `Qwen/Qwen3-Embedding-8B` | 200 pitches per request |
 
 Why Token Factory mattered: the whole catalogue, 2,261 houses and 9,044 persona pitches, is profiled and embedded in about 1 hour for under $5, and a listing page answers in 1 to 6 s. The Nemotron models think by default on Token Factory, so the backend sends `chat_template_kwargs: {enable_thinking: false}` for these "write JSON from the given material" calls; they come back in under a second instead of spending the token budget on reasoning. Structured output is `response_format` JSON with the pydantic schema checked on our side.

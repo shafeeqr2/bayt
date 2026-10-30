@@ -8,7 +8,7 @@ bayt.andalsolutions.com {
 	# Route handlers in frontend/app/api/**/route.ts. The browser calls these and
 	# they proxy to the API themselves. Keep this list in step with that folder:
 	# a new handler under /api that is not listed here would hit FastAPI instead.
-	@next_api path /api/pins /api/pins/* /api/city/boundary /api/tiles/buildings/* /api/listings/*/zoning/ask /api/listings/*/zoning/pathways
+	@next_api path /api/pins /api/pins/* /api/city/boundary /api/tiles/buildings/* /api/listings/*/zoning/ask /api/listings/*/zoning/pathways /api/session /api/session/events
 
 	# FastAPI: every route in backend/app/main.py is under /api, plus its docs.
 	@backend path /api/* /docs /docs/* /openapi.json /redoc

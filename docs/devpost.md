@@ -53,12 +53,15 @@ Bayt is a real estate search for Toronto with 2,261 live listings. For every lis
 4. **Search by fit.** The search page has an "I am a" selector and a "Best fit"
    sort, so an investor sees investor-scored homes first, with the score on each
    card.
-5. **The rest of the app** gives buyers clarity before they purchase: a lot and
+5. **Session taste.** No login. Tap the heart on homes you like. After every 5
+   actions Nemotron sums up what you seem to like, guesses the buyer type you are,
+   and above 70% confidence the site sets that buyer for you.
+6. **The rest of the app** gives buyers clarity before they purchase: a lot and
    zoning analysis from City of Toronto open data (coverage, height, as-of-right
    units, garden suite potential, nearby Committee of Adjustment decisions), a
    zoning question box answered by Nemotron with citations to the by-law and the
-   analysis, photo labels that feed a possible floor plan, and an investment
-   estimate per listing.
+   analysis, photo labels and a Nemotron-completed room list that feed a possible floor
+   plan, and an investment estimate per listing.
 
 ## How we built it
 
@@ -74,6 +77,8 @@ Bayt is a real estate search for Toronto with 2,261 live listings. For every lis
 | "Like this, but..." rewrite | `nvidia/Nemotron-3.5-Super-VL` | 1 per typed ask, cached 24 h |
 | Photo labels | `nvidia/Nemotron-3.5-Super-VL` | 1 per listing |
 | Zoning answer with citations | `nvidia/nemotron-3-super-120b-a12b` | 2 per new question, cached |
+| Room completion for the floor plan (rooms the description and photos name) | `nvidia/nemotron-3-super-120b-a12b` | 1 per listing, cached |
+| Session taste: a summary of what you keep opening and saving, with a buyer-type guess | `nvidia/nemotron-3-super-120b-a12b` | 1 per 5 actions, no login |
 | Pitch embeddings, 2,048 dims | `Qwen/Qwen3-Embedding-8B` | 200 pitches per request |
 
 - Where Token Factory accelerated the work: the whole catalogue, 2,261 houses and
@@ -117,8 +122,7 @@ Bayt is a real estate search for Toronto with 2,261 live listings. For every lis
 
 ## What's next for Bayt
 
-- Session taste: learn from opens and saves in a session, no login, and set the
-  default persona from it.
+- Taste across devices: the session is a cookie today.
 - Transit, schools and walk data in the profile, so location asks work.
 - Hand-judged gates: 50 profiles read, 100 pair judgments, 10 steering trials.
 
@@ -134,13 +138,16 @@ Live site, no login: https://bayt.andalsolutions.com
 
 1. On the search page set "I am a" to **Investor** and sort by **Best fit**. Every
    card shows that buyer's score.
-2. Open a house. Under the price, 4 chips show the score per buyer. Click
-   **Investor**. The "Similar homes" row shows 8 houses with 1 reason each.
-3. In the "Like this, but..." box type **bigger backyard and a garage** and press
-   Enter. The list and the reasons change. Turn the **Money** chip off to search
-   every price.
+2. Open a house. "Who this home suits" shows the score per buyer. Click
+   **More like this**: a page with 8 houses ranked for that buyer, 1 reason each.
+   The sparkle button on any tile opens the same page for that house.
+3. In the "Like this, but…" box type **bigger backyard and a garage** and click
+   **Find homes like this**. The list and the reasons change. Turn the **Money**
+   chip off to search every price.
 4. Scroll to "What could you build here?", type **keep the house and add a second
    storey**, and click "Check the zoning" for the cited answer.
+5. Tap the heart on 5 homes, then open **Saved** in the header: Nemotron sums up
+   what you like and names the buyer you are. The search page now defaults to it.
 
 Run it yourself: `git clone`, `./start.sh`, open http://localhost:3000. The first
 run seeds the database. Put a Token Factory key in `.env` as `LLM_API_KEY` for the
@@ -202,9 +209,9 @@ on the action.
 | 0:00 | Search page, Toronto homes | "This is Bayt, a house search for Toronto. Two thousand two hundred listings. Every one of them has been read by NVIDIA Nemotron on Nebius Token Factory." |
 | 0:15 | Set "I am a: Investor", sort "Best fit", click Search | "Say who you are. An investor. Sort by best fit. Each card now shows how well the house fits an investor, one to ten." |
 | 0:35 | Open 39 Rhydwen Avenue | "Open one. Under the price, four scores, one to ten, for a first-time buyer, an investor, a flipper and a builder. The same house, four reasons." |
-| 0:55 | Scroll to Similar homes, Investor active | "Similar homes for an investor. Eight houses in the same price band within five kilometres, ranked by Nemotron, with one reason each. Two rentable doors, seven percent yield, multiplex zone." |
+| 0:55 | Click "More like this", Investor active | "More like this, for an investor. Eight houses in the same price band within five kilometres, ranked by Nemotron, with one reason each. Two rentable doors, seven percent yield, multiplex zone." |
 | 1:20 | Click First-time buyer chip | "Switch to first-time buyer. Different houses, different reasons: move-in ready, parking, updated kitchen." |
-| 1:35 | Type "bigger backyard and a garage", Enter | "Now steer it. Like this, but a bigger backyard and a garage. Nemotron rewrites what we are looking for, the search runs again, and every reason says how the house meets the ask." |
+| 1:35 | Type "bigger backyard and a garage", click Find homes like this | "Now steer it. Like this, but a bigger backyard and a garage. Nemotron rewrites what we are looking for, the search runs again, and every reason says how the house meets the ask." |
 | 2:00 | Turn the Money chip off | "Turn money off to search every price. Location off to search the whole city." |
 | 2:12 | Scroll to "What could you build here?", type a plan, click Check | "And because buyers want clarity, Bayt reads the zoning. Keep the house, add a second storey. The answer cites the by-law and the lot analysis." |
 | 2:35 | README "AI models" section | "All of it runs on Nebius Token Factory with NVIDIA Nemotron. The whole catalogue was profiled in seventy-eight minutes for about eight dollars. The code is open source." |
