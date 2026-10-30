@@ -294,3 +294,63 @@ class SimilarResult(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+
+class FloorPlanHint(Base):
+    """What the text model read about the rooms a listing does not list (`app.lot.rooms.Completion`).
+
+    One row per listing. `hints` is null when the model gave nothing usable, with the
+    reason in `note`; `model` and `prompt_version` say what wrote it.
+    """
+
+    __tablename__ = "floor_plan_hints"
+
+    listing_id: Mapped[str] = mapped_column(
+        String(32), ForeignKey("listings.id", ondelete="CASCADE"), primary_key=True
+    )
+    model: Mapped[str] = mapped_column(Text)
+    prompt_version: Mapped[int] = mapped_column(Integer)
+    hints: Mapped[dict[str, Any] | None] = mapped_column(JSONB(none_as_null=True))
+    note: Mapped[str | None] = mapped_column(Text)
+    computed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class SessionEvent(Base):
+    """One thing a visitor did in a session: opened, saved, unsaved or dismissed a listing.
+
+    No login: the session is a random id in an httpOnly cookie. `via` says how the
+    visitor reached the listing (similar, search, direct); `persona` the buyer type in
+    view at the time. The taste summary (`SessionTaste`) is written from these.
+    """
+
+    __tablename__ = "session_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[str] = mapped_column(String(64), index=True)
+    listing_id: Mapped[str] = mapped_column(String(32), ForeignKey("listings.id", ondelete="CASCADE"))
+    kind: Mapped[str] = mapped_column(String(16))
+    via: Mapped[str | None] = mapped_column(String(16))
+    persona: Mapped[str | None] = mapped_column(String(32))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class SessionTaste(Base):
+    """What the text model made of a session's actions (`app.taste.service.Taste`), rewritten every 5 actions.
+
+    `summary` is null when the model gave nothing usable, with the reason in `note`.
+    """
+
+    __tablename__ = "session_taste"
+
+    session_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    actions: Mapped[int] = mapped_column(Integer)
+    summary: Mapped[str | None] = mapped_column(Text)
+    persona: Mapped[str | None] = mapped_column(String(32))
+    confidence: Mapped[float | None] = mapped_column(Float)
+    likes: Mapped[list[str] | None] = mapped_column(JSONB(none_as_null=True))
+    model: Mapped[str] = mapped_column(Text)
+    prompt_version: Mapped[int] = mapped_column(Integer)
+    note: Mapped[str | None] = mapped_column(Text)
+    computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

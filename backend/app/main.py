@@ -1,6 +1,7 @@
 from typing import Annotated, Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Response
+from pydantic import BaseModel, Field
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import Select, func, select, text
 from sqlalchemy.orm import Session, contains_eager
@@ -11,7 +12,7 @@ from app.city.tiles import MAX_ZOOM, MIN_ZOOM, building_tile, buildings_loaded, 
 from app.city.zones import zone_label, zone_rules
 from app.config import settings
 from app.db import get_session
-from app.lot import floorplan
+from app.lot import floorplan, rooms
 from app.lot import service as lot_service
 from app.lot.floorplan import FloorPlanResult
 from app.lot.schemas import LotAnalysis
@@ -35,6 +36,7 @@ from app.schemas import (
 from app.strategy import estimate as strategy_estimate
 from app.strategy import parse as strategy_parse
 from app.strategy import search as strategy
+from app.taste import service as taste
 from app.strategy.finance import Financing
 from app.zoning import answer as zoning_answer
 from app.zoning import cards as zoning_cards
@@ -344,7 +346,11 @@ def get_listing_floorplan(listing_id: str, session: SessionDep) -> FloorPlanResu
         return FloorPlanResult(plan=None, reason=outside)
     try:
         lot = lot_service.analyze_listing(session, listing)
-        return FloorPlanResult(plan=floorplan.floor_plan_for(listing, lot))
+        # Rooms the description and the photos name but the room table leaves out: one cached model call.
+        hint_row = rooms.hints_for(session, listing, rooms.make_client())
+        hints = hint_row.hints if hint_row else None
+        hints_key = f"{hint_row.model}:{hint_row.prompt_version}:{hint_row.computed_at.isoformat()}" if hint_row else ""
+        return FloorPlanResult(plan=floorplan.floor_plan_for(listing, lot, hints, hints_key))
     except lot_service.NotInCoverage:
         return FloorPlanResult(plan=None, reason=outside)
     except lot_service.ListingNotLocated:
@@ -554,3 +560,77 @@ def get_point_precedents(
 def get_playbook() -> list[zoning_cards.StrategyCard]:
     """Every playbook card, so the frontend and reviewers can read the pathways and their triggers."""
     return zoning_cards.playbook()
+
+
+# --- Session taste (similar homes, phase 4) -------------------------------------------------------
+
+
+class SessionEventIn(BaseModel):
+    kind: taste.Kind
+    listing_id: str
+    via: taste.Via | None = None
+    persona: house_profile.Persona | None = None
+
+
+class TasteOut(BaseModel):
+    summary: str
+    persona: str | None
+    confidence: float | None
+    likes: list[str] = Field(default_factory=list)
+    actions: int
+    default_persona: str | None = Field(description="The buyer to preselect; null below the confidence threshold")
+
+
+class SessionEventOut(BaseModel):
+    actions: int
+    taste: TasteOut | None
+
+
+class SessionOut(BaseModel):
+    actions: int
+    saves: list[ListingSummary]
+    taste: TasteOut | None
+
+
+def _taste_out(row) -> TasteOut | None:
+    if row is None:
+        return None
+    return TasteOut(
+        summary=row.summary, persona=row.persona, confidence=row.confidence, likes=row.likes or [], actions=row.actions,
+        default_persona=taste.default_persona(row),
+    )
+
+
+def _sid(sid: str) -> str:
+    if not taste.valid_sid(sid):
+        raise HTTPException(status_code=422, detail="Session id must be 8 to 64 letters, digits, _ or -")
+    return sid
+
+
+@app.post("/api/session/{sid}/events")
+def post_session_event(sid: str, body: SessionEventIn, session: SessionDep) -> SessionEventOut:
+    """Record an open, save, unsave or dismiss. Every 5th action rewrites the taste summary (1 model call)."""
+    sid = _sid(sid)
+    if session.get(Listing, body.listing_id) is None:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    actions = taste.record(session, sid, body.listing_id, body.kind, body.via, body.persona)
+    row = taste.summarize(session, sid, actions, taste.make_client()) if taste.due(actions) else taste.taste_for(session, sid)
+    return SessionEventOut(actions=actions, taste=_taste_out(row))
+
+
+@app.get("/api/session/{sid}")
+def get_session_state(sid: str, session: SessionDep) -> SessionOut:
+    """The saved homes and the taste summary for a session. Never calls the model."""
+    sid = _sid(sid)
+    actions = session.scalar(select(func.count()).select_from(taste.SessionEvent).where(taste.SessionEvent.session_id == sid)) or 0
+    ids = taste.saves(session, sid)
+    rows = {r.id: r for r in session.scalars(select(Listing).where(Listing.id.in_(ids))).all()} if ids else {}
+    scores = _persona_scores(session, ids)
+    items = [_summary(rows[i], Financing()).model_copy(update={"persona_scores": scores.get(i)}) for i in ids if i in rows]
+    return SessionOut(actions=actions, saves=items, taste=_taste_out(taste.taste_for(session, sid)))
+
+
+@app.get("/api/metrics/similar")
+def similar_metric(session: SessionDep) -> dict:
+    """Share of sessions with a save whose saved house was first opened from the similar page."""
+    return taste.similar_metric(session)

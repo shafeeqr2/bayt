@@ -62,9 +62,10 @@ def test_a_room_bigger_than_the_house_is_reported_not_placed():
     assert "Great room (did not fit)" in level.not_placed
 
 
-def test_rooms_without_size_or_level_are_reported():
+def test_rooms_without_a_level_are_reported_and_unsized_rooms_still_drawn():
     result = plan(HOUSE, MAIN + [room("Foyer", "Main level", "Measurements not available"), room("Den", "Other", "3 m x 3 m")])
-    assert "Foyer (no size given)" in result.levels[0].not_placed
+    foyer = next(r for r in result.levels[0].rooms if r.name == "Foyer")
+    assert foyer.size_assumed and result.levels[0].not_placed == []
     assert any("Den" in note for note in result.notes)
 
 
@@ -161,3 +162,80 @@ def test_a_tight_narrow_house_still_keeps_the_kitchen_behind_the_living_room():
     ]
     shapes = rects(plan(narrow, rooms).levels[0])
     assert shapes["Living room"].centroid.y < shapes["Kitchen"].centroid.y
+
+
+# --- Unsized rooms, rooms from the text, and oversize upper floors --------------------------------
+
+
+def test_a_room_with_no_size_is_drawn_at_a_typical_size():
+    rooms = MAIN + [room("Office", "Main level", "Measurements not available")]
+    level = plan(HOUSE, rooms).levels[0]
+    office = next(r for r in level.rooms if r.name == "Office")
+    assert office.size_assumed and not office.assumed
+    assert (office.width, office.depth) in {(2.8, 3.0), (3.0, 2.8)}
+    assert not any("no size given" in n for n in level.not_placed)
+
+
+def test_extra_rooms_from_the_text_are_drawn_as_assumed_and_never_duplicate_listed_ones():
+    extras = [
+        ("Main level", floorplan.RoomSpec("Kitchen", 3.2, 3.8, note="named in the description")),  # listed already: dropped
+        ("Second level", floorplan.RoomSpec("Bedroom 3", 3.3, 3.6, note="named in the description: 'third bedroom'")),
+        ("Basement", floorplan.RoomSpec("Recreational, Games room", 4.0, 6.0, note="named in the photos")),  # no basement: dropped
+    ]
+    result = plan(HOUSE, MAIN + UPPER, extra_rooms=extras)
+    main, upper = result.levels
+    assert sum(1 for r in main.rooms if r.name == "Kitchen") == 1
+    bed3 = next(r for r in upper.rooms if r.name == "Bedroom 3")
+    assert bed3.assumed and bed3.size_assumed and bed3.note and "description" in bed3.note
+    assert any("read from the listing text" in n for n in result.notes)
+
+
+def test_an_oversize_upper_floor_is_cut_from_the_back():
+    big = box(0, 0, 14, 16)  # 224 m2 footprint
+    result = plan(big, MAIN + UPPER, interior_m2=150.0)  # 75 m2 expected per above-grade level
+    main, upper = result.levels
+    assert math.isclose(main.floor_area_m2, 224.0, abs_tol=0.5)
+    assert 75.0 <= upper.floor_area_m2 <= 95.0
+    outline = Polygon(upper.outline["coordinates"][0])
+    assert outline.bounds[1] == pytest.approx(0.0, abs=0.01)  # the front wall stays
+    assert any("drawn smaller than the ground footprint" in n for n in result.notes)
+    assert not any("Upper floors use the ground-floor outline" in n for n in result.notes)
+
+
+def test_a_top_floor_share_from_the_model_cuts_the_top_level_only():
+    result = plan(HOUSE, MAIN + UPPER, upper_floor_share=0.5)
+    main, upper = result.levels
+    assert math.isclose(main.floor_area_m2, 96.0, abs_tol=0.5)
+    assert 44.0 <= upper.floor_area_m2 <= 52.0
+
+
+def test_an_upper_floor_that_fits_the_listed_size_is_left_alone():
+    result = plan(HOUSE, MAIN + UPPER, interior_m2=180.0)
+    assert all(math.isclose(lvl.floor_area_m2, 96.0, abs_tol=0.5) for lvl in result.levels)
+    assert any("Upper floors use the ground-floor outline" in n for n in result.notes)
+
+
+def test_hints_become_extra_rooms_and_skip_unsized_listed_rooms():
+    hints = {
+        "rooms": [
+            {"name": "Bedroom 4", "level": "Basement", "width_m": 3.3, "depth_m": 3.6, "source": "description", "why": "'4th bedroom down'"},
+            {"name": "Office", "level": "Main level", "width_m": 2.8, "depth_m": 3.0, "source": "room list", "why": "no size"},
+            {"name": "Bad", "level": "Main level", "width_m": "x", "depth_m": 3.0, "source": "photos"},
+        ],
+        "upper_floor_share": None,
+    }
+    extras = floorplan.extra_rooms_from_hints(hints)
+    assert [(lvl, r.name) for lvl, r in extras] == [("Basement", "Bedroom 4")]
+    assert extras[0][1].note == "named in the description: '4th bedroom down'"
+    assert floorplan.extra_rooms_from_hints(None) == []
+
+
+def test_interior_size_reads_the_middle_of_the_range():
+    class L:
+        sqft_min, sqft_max = 1500, 2000
+
+    assert floorplan.interior_m2(L()) == pytest.approx(1750 * 0.0929)
+    L.sqft_min = None
+    assert floorplan.interior_m2(L()) == pytest.approx(2000 * 0.0929)
+    L.sqft_max = None
+    assert floorplan.interior_m2(L()) is None

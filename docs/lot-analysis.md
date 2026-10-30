@@ -83,3 +83,36 @@ Queries are sent as POST: the city's firewall rejects GET URLs carrying a parcel
 - Show the severance and garden-suite verdicts on the listing page, and let search filter on them.
 - Watermain facts (material, install year, breaks nearby) from Toronto Water's open data.
 - Add other municipalities' open data behind `LotInputs`.
+
+## Possible layout: filling the plan (30 October 2026)
+
+An audit of 41 Toronto houses (122 levels) found the generated plans a median
+57% full, with 13% of levels under 30% full. Three causes, three fixes in
+`app/lot/floorplan.py` and one model call in `app/lot/rooms.py`:
+
+1. **Rooms listed with no size** were skipped. They are now drawn at a typical
+   size for their kind (`TYPICAL`), marked `size_assumed`, with the reason in
+   the tooltip.
+2. **Upper floors drawn on the ground footprint.** The footprint includes
+   garages and porches and the real upper floor is often set back. When a level
+   above the main floor is more than 1.3 times the listed interior size divided
+   by the above-grade levels, it is cut from the back (the front wall stays) to
+   1.1 times that. A 1.5-storey or loft read by the model
+   (`upper_floor_share`) cuts the top level too.
+3. **Rooms the table leaves out.** TRREB lists at most 12 rooms. One structured
+   call to `nvidia/nemotron-3-super-120b-a12b` on Token Factory reads the room
+   table, the counts, the description and the photo labels and returns the rooms
+   they name that the table lacks ("large cozy Family room", "2 bathrooms in the
+   lower-level suite"), each with a typical size and a quote as evidence. They
+   are drawn as assumed (dashed) with the source in the tooltip. The answer is
+   cached per listing in `floor_plan_hints`; without a key the plan uses the
+   table alone. `clean()` maps the model's level names ("Ground level") to the 4
+   we draw, drops echoes of listed rooms and clamps sizes.
+
+After the deterministic fixes alone the same 122 levels are a median 63% full
+and 4% are under 30%. With the model's rooms, 3 Indianola Dr's main floor goes
+from 74% to 84%.
+
+What is still a guess: room positions, the stair, and any level the listing
+mislabels (a "Third level" bedroom in a bungalow). A `floor_plan` photo, when the
+listing has one, is the next source to read (`docs/photo-labels.md`).

@@ -56,6 +56,46 @@ DOUBLE_GARAGE = (6.0, 6.0)
 DOUBLE_GARAGE_MIN_WIDTH_M = 12.0
 NARROW_HOUSE_M = 7.0  # below this the stair runs along a side wall
 
+SQFT_TO_M2 = 0.0929
+# An upper floor drawn on the ground outline is cut from the back when the outline is this much
+# bigger than the listed interior size allows: footprints include garages, porches and set-backs.
+UPPER_CAP_RATIO = 1.3
+UPPER_CAP_SLACK = 1.1  # draw the cut level this much over the expected area, not exactly at it
+MIN_LEVEL_DEPTH_M = 4.0
+
+# Typical sizes (metres) for a listed room with no size, by role; the default for the rest.
+TYPICAL: dict[str, tuple[float, float]] = {
+    "primary bedroom": (3.7, 4.5),
+    "bedroom": (3.3, 3.6),
+    "bathroom": (2.4, 1.5),
+    "kitchen": (3.2, 3.8),
+    "kitchen/dining room": (3.5, 5.5),
+    "living room": (3.6, 4.6),
+    "dining room": (3.2, 3.6),
+    "family room": (3.6, 4.6),
+    "great room": (4.5, 5.5),
+    "recreational, games room": (4.0, 6.0),
+    "games room": (4.0, 5.0),
+    "office": (2.8, 3.0),
+    "den": (2.8, 3.0),
+    "study": (2.8, 3.0),
+    "foyer": (1.8, 2.4),
+    "laundry room": (1.8, 2.4),
+    "utility room": (2.0, 3.0),
+    "furnace": (2.0, 2.5),
+    "cold room": (1.5, 2.5),
+    "storage": (2.0, 2.5),
+    "mud room": (1.8, 2.4),
+    "pantry": (1.2, 2.0),
+    "eating area": (2.8, 3.0),
+    "sunroom": (2.8, 3.6),
+    "media": (3.6, 4.6),
+    "exercise room": (3.0, 4.0),
+    "workshop": (3.0, 4.0),
+    "loft": (3.6, 4.6),
+}
+DEFAULT_TYPICAL = (3.0, 3.3)
+
 CONDO_OWNERSHIP = {"Condominium/Strata", "Condominium", "Leasehold Condo/Strata", "Shares in Co-operative"}
 
 # Listing level names, mapped to the level we draw and its order from the bottom.
@@ -143,6 +183,8 @@ class PlanRoom(BaseModel):
     depth: float
     size: str | None = Field(None, description="The size as listed")
     scale: float | None = Field(None, description="Drawn at this share of the listed size so it fits; None when full size")
+    size_assumed: bool = Field(False, description="True when the listing gives no size and a typical one is drawn")
+    note: str | None = Field(None, description="Where an assumed room comes from, e.g. 'named in the description'")
 
 
 class PlanLevel(BaseModel):
@@ -221,6 +263,8 @@ class RoomSpec:
     assumed: bool = False
     size: str | None = None
     scale: float = 1.0
+    size_assumed: bool = False
+    note: str | None = None
 
     @property
     def key(self) -> str:
@@ -496,8 +540,17 @@ def plan(
     half_baths: int = 0,
     attached_garage: bool = False,
     street_side_known: bool = True,
+    extra_rooms: list[tuple[str, RoomSpec]] | None = None,
+    interior_m2: float | None = None,
+    upper_floor_share: float | None = None,
 ) -> FloorPlan:
-    """Fit the listed rooms into a street-aligned outline (front wall at y = 0)."""
+    """Fit the listed rooms into a street-aligned outline (front wall at y = 0).
+
+    `extra_rooms` are (level name, room) pairs from outside the room table, such as
+    rooms the description names; they are drawn as assumed. `interior_m2` is the
+    listed interior size (above grade) and `upper_floor_share` the share of the
+    footprint the top floor covers when known; both cut oversize upper levels.
+    """
     minx, miny, maxx, maxy = outline.bounds
     width, depth = maxx - minx, maxy - miny
     rows, cols = math.ceil(depth / GRID_M), math.ceil(width / GRID_M)
@@ -507,6 +560,7 @@ def plan(
     unsized: dict[int, list[str]] = {}
     unlevelled: list[str] = []
     listed_baths: dict[int, int] = {}
+    typical_sized = 0
     for room in rooms:
         name = (room.get("type") or "Room").strip()
         level = LEVELS.get((room.get("level") or "").strip())
@@ -517,22 +571,47 @@ def plan(
         dims = parse_dimension(room.get("dimension"))
         if role_key(name) == "bathroom":
             listed_baths[idx] = listed_baths.get(idx, 0) + 1
-        if dims is None:
-            unsized.setdefault(idx, []).append(name)
-            if role_key(name) != "bathroom":
-                by_level.setdefault(idx, [])
-            continue
         kind = "bathroom" if role_key(name) == "bathroom" else "room"
+        if dims is None:
+            # No size in the listing: draw the room at a typical size rather than leave it out.
+            dims = typical_size(name)
+            typical_sized += 1
+            by_level.setdefault(idx, []).append(
+                RoomSpec(name, dims[0], dims[1], kind=kind, size_assumed=True, note="listed with no size; drawn at a typical size")
+            )
+            continue
         by_level.setdefault(idx, []).append(RoomSpec(name, dims[0], dims[1], kind=kind, size=room.get("dimension")))
     if not by_level:
         raise NoPlan("The listing gives no rooms with a level, so there is nothing to place.")
+    if typical_sized:
+        notes.append("Rooms the listing gives no size for are drawn at a typical size for their kind.")
+
+    added = 0
+    for level_name, spec in extra_rooms or []:
+        idx = next((i for n, i in LEVELS.values() if n == level_name), None)
+        if idx is None or idx not in by_level:
+            continue
+        if not _room_is_new(spec, by_level[idx]):
+            continue
+        if spec.kind == "bathroom":
+            listed_baths[idx] = listed_baths.get(idx, 0) + 1
+        by_level[idx].append(replace(spec, assumed=True, size_assumed=True))
+        added += 1
+    if added:
+        notes.append("Rooms marked as assumed with a source were read from the listing text or the photos; the room table does not list them.")
 
     for idx, extra in assumed_bathrooms(full_baths, half_baths, by_level, listed_baths).items():
         by_level[idx].extend(extra)
-    if any(r.assumed for rs in by_level.values() for r in rs):
+    if any(r.assumed and r.kind == "bathroom" for rs in by_level.values() for r in rs):
         notes.append("Bathrooms marked as assumed come from the listing's bathroom count; their places and sizes are a guess.")
 
     level_outline = {idx: outline for idx in by_level}
+    cut = _cap_upper_levels(level_outline, outline, interior_m2, upper_floor_share)
+    if cut:
+        notes.append(
+            f"The {_join(cut)} {'is' if len(cut) == 1 else 'are'} drawn smaller than the ground footprint, to match the listed "
+            "interior size: upper floors are often set back, and footprints include garages and porches."
+        )
     garage_box: Polygon | None = None
     if attached_garage and MAIN in by_level:
         garage_box = _place_garage(outline, rows, cols, width)
@@ -580,14 +659,14 @@ def plan(
             "Rooms marked as smaller are drawn up to 15% under their listed size so they fit the outline. "
             "Listed sizes are usually the longest measurements and can include closets or bay windows."
         )
+    if any(i >= 2 for i in by_level) and not cut:
+        notes.append("Upper floors use the ground-floor outline; the real upper floor may be smaller.")
     overfull = [lvl.name for lvl in levels if lvl.listed_area_m2 > OVERFULL_SHARE * lvl.floor_area_m2]
     if overfull:
         notes.append(
             f"The listed rooms on the {_join(overfull)} add up to nearly all of the outline or more. Listings often give "
             "open-plan spaces twice or round sizes up, so some rooms could not be placed."
         )
-    if any(i >= 2 for i in by_level):
-        notes.append("Upper floors use the ground-floor outline; the real upper floor may be smaller.")
     if unlevelled:
         notes.append(f"Not drawn because the listing gives no level: {', '.join(unlevelled)}.")
     if not street_side_known:
@@ -623,6 +702,73 @@ def _choose_stairs(
         return tuple(total)
 
     return min(candidates, key=cost)  # ties keep the usual choice, which comes first
+
+
+def typical_size(name: str) -> tuple[float, float]:
+    """A usual size for a room of this kind, when the listing gives none."""
+    if "powder" in name.lower():
+        return HALF_BATH
+    return TYPICAL.get(role_key(name), DEFAULT_TYPICAL)
+
+
+def _room_is_new(spec: RoomSpec, existing: list[RoomSpec]) -> bool:
+    """True unless a listed room of the same kind is already on the level (bedrooms and bathrooms may repeat)."""
+    if spec.key in ("bedroom", "bathroom"):
+        return not any(r.name.strip().lower() == spec.name.strip().lower() for r in existing)
+    return not any(r.key == spec.key for r in existing)
+
+
+def _cap_upper_levels(
+    level_outline: dict[int, Polygon], outline: Polygon, interior_m2: float | None, upper_floor_share: float | None
+) -> list[str]:
+    """Cut levels above the main floor from the back when the footprint is clearly bigger than they are.
+
+    The expected area per above-grade level is the listed interior size over the
+    number of above-grade levels. A level drawn on an outline more than
+    UPPER_CAP_RATIO times that is cut to UPPER_CAP_SLACK times it. The top level is
+    also cut to `upper_floor_share` of the footprint when the model read a smaller
+    top floor. Returns the names of the cut levels.
+    """
+    above = sorted(i for i in level_outline if i >= MAIN)
+    if not above:
+        return []
+    expected = interior_m2 / len(above) if interior_m2 and interior_m2 > 0 else None
+    cut: list[str] = []
+    for idx in above:
+        if idx == MAIN:
+            continue
+        current = level_outline[idx]
+        targets: list[float] = []
+        if expected and current.area > UPPER_CAP_RATIO * expected:
+            targets.append(expected * UPPER_CAP_SLACK)
+        if upper_floor_share and idx == above[-1]:
+            targets.append(outline.area * upper_floor_share)
+        if not targets:
+            continue
+        target = min(targets)
+        if current.area <= target * 1.02:
+            continue
+        capped = _cut_from_back(current, target)
+        if capped.area < current.area * 0.98:
+            level_outline[idx] = capped
+            cut.append(next(n for n, i in LEVELS.values() if i == idx))
+    return cut
+
+
+def _cut_from_back(outline: Polygon, target_m2: float) -> Polygon:
+    """The front part of the outline (y from 0) with about `target_m2` of area, never shallower than MIN_LEVEL_DEPTH_M."""
+    minx, miny, maxx, maxy = outline.bounds
+    lo, hi = miny + MIN_LEVEL_DEPTH_M, maxy
+    if lo >= hi:
+        return outline
+    for _ in range(24):
+        mid = (lo + hi) / 2
+        part = _largest(outline.intersection(box(minx - 1, miny - 1, maxx + 1, mid)))
+        if part.area < target_m2:
+            lo = mid
+        else:
+            hi = mid
+    return _largest(outline.intersection(box(minx - 1, miny - 1, maxx + 1, round(hi, 1))).buffer(0))
 
 
 def _depth_weight(level: int) -> float:
@@ -675,6 +821,8 @@ def _to_room(p: Placed) -> PlanRoom:
         depth=round(depth, 2),
         size=p.spec.size,
         scale=p.spec.scale if p.spec.scale < 1 else None,
+        size_assumed=p.spec.size_assumed,
+        note=p.spec.note,
     )
 
 
@@ -685,26 +833,56 @@ CACHE_SIZE = 512
 _cache: OrderedDict[tuple[str, str, str], FloorPlan] = OrderedDict()
 
 
-def floor_plan_for(listing: Any, lot: LotAnalysis) -> FloorPlan:
+def floor_plan_for(listing: Any, lot: LotAnalysis, hints: dict[str, Any] | None = None, hints_key: str = "") -> FloorPlan:
     """A possible plan for a listing, or NoPlan with the reason.
 
+    `hints` is a serialized `app.lot.rooms.Completion` (rooms the text model read
+    from the description and the photos); `hints_key` says which, for the cache.
     Plans take up to a few seconds for large houses, so the latest few hundred
     are kept in memory, keyed by the listing and when its data last changed.
     """
     if listing.building_type == "Apartment" or listing.ownership_type in CONDO_OWNERSHIP:
         raise NoPlan("Condo units are not drawn: the city outline covers the whole building.")
-    key = (str(listing.id), str(getattr(listing, "source_updated_at", "")), lot.computed_at.isoformat())
+    key = (str(listing.id), str(getattr(listing, "source_updated_at", "")), lot.computed_at.isoformat() + "|" + hints_key)
     if key in _cache:
         _cache.move_to_end(key)
         return _cache[key]
-    result = _floor_plan_for(listing, lot)
+    result = _floor_plan_for(listing, lot, hints)
     _cache[key] = result
     if len(_cache) > CACHE_SIZE:
         _cache.popitem(last=False)
     return result
 
 
-def _floor_plan_for(listing: Any, lot: LotAnalysis) -> FloorPlan:
+def interior_m2(listing: Any) -> float | None:
+    """The listed interior size in square metres (the middle of the range), or None."""
+    lo, hi = getattr(listing, "sqft_min", None), getattr(listing, "sqft_max", None)
+    if lo and hi:
+        return (lo + hi) / 2 * SQFT_TO_M2
+    if lo or hi:
+        return float(lo or hi) * SQFT_TO_M2
+    return None
+
+
+def extra_rooms_from_hints(hints: dict[str, Any] | None) -> list[tuple[str, RoomSpec]]:
+    """(level name, room) pairs from a serialized `app.lot.rooms.Completion`."""
+    out: list[tuple[str, RoomSpec]] = []
+    for r in (hints or {}).get("rooms") or []:
+        try:
+            name, level = str(r["name"]), str(r["level"])
+            a, b = float(r["width_m"]), float(r["depth_m"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        source = str(r.get("source") or "")
+        if source == "room list":
+            continue  # unsized listed rooms already get a typical size from the table itself
+        kind = "bathroom" if role_key(name) == "bathroom" else "room"
+        note = f"named in the {source or 'listing'}" + (f": {r['why']}" if r.get("why") else "")
+        out.append((level, RoomSpec(name, a, b, kind=kind, note=note[:120])))
+    return out
+
+
+def _floor_plan_for(listing: Any, lot: LotAnalysis, hints: dict[str, Any] | None = None) -> FloorPlan:
     mains = [shape(f.geometry) for f in lot.geometry.buildings if f.properties.is_main and f.properties.on_lot]
     if not mains:
         raise NoPlan("The city has no building outline on this lot.")
@@ -722,6 +900,9 @@ def _floor_plan_for(listing: Any, lot: LotAnalysis) -> FloorPlan:
         half_baths=half,
         attached_garage=_attached_garage(listing.parking_type, listing.building_type, lot),
         street_side_known=known,
+        extra_rooms=extra_rooms_from_hints(hints),
+        interior_m2=interior_m2(listing),
+        upper_floor_share=(hints or {}).get("upper_floor_share"),
     )
 
 
