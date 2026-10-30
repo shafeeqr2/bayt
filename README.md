@@ -3,6 +3,16 @@
 Real estate search that gives buyers clarity before they purchase.
 See the [product brief](docs/product-brief.md) for goals, users, and features.
 
+## Try it
+
+Live, no login: **https://bayt.andalsolutions.com**
+
+1. On the search page set "I am a" to Investor and sort by "Best fit". Each card shows that buyer's score, 1 to 10.
+2. Open a house. Under the price, 4 chips score it for a first-time buyer, an investor, a flipper and a builder. Click one: "Similar homes" shows 8 houses ranked for that buyer with 1 reason each.
+3. In "Like this, but..." type `bigger backyard and a garage`. The matches and the reasons change. The chips under it choose what counts.
+
+Every model call runs on [Nebius Token Factory](https://tokenfactory.nebius.com) with NVIDIA Nemotron; see "AI models" below. Design notes for the feature: [docs/similar-homes.md](docs/similar-homes.md).
+
 ## Quick start
 
 You need [Docker Desktop](https://www.docker.com/products/docker-desktop/) (running) and Node.js 20.9+ (24 recommended, see `frontend/.nvmrc`).
