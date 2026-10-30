@@ -201,7 +201,7 @@ on the action.
 |---|---|---|
 | 0:00 | Search page, Toronto homes | "This is Bayt, a house search for Toronto. Two thousand two hundred listings. Every one of them has been read by NVIDIA Nemotron on Nebius Token Factory." |
 | 0:15 | Set "I am a: Investor", sort "Best fit", click Search | "Say who you are. An investor. Sort by best fit. Each card now shows how well the house fits an investor, one to ten." |
-| 0:35 | Open 39 Rhydwen Avenue | "Open one. Under the price, four scores: first-time buyer eight, investor nine, flipper four, builder six. The same house, four reasons." |
+| 0:35 | Open 39 Rhydwen Avenue | "Open one. Under the price, four scores, one to ten, for a first-time buyer, an investor, a flipper and a builder. The same house, four reasons." |
 | 0:55 | Scroll to Similar homes, Investor active | "Similar homes for an investor. Eight houses in the same price band within five kilometres, ranked by Nemotron, with one reason each. Two rentable doors, seven percent yield, multiplex zone." |
 | 1:20 | Click First-time buyer chip | "Switch to first-time buyer. Different houses, different reasons: move-in ready, parking, updated kitchen." |
 | 1:35 | Type "bigger backyard and a garage", Enter | "Now steer it. Like this, but a bigger backyard and a garage. Nemotron rewrites what we are looking for, the search runs again, and every reason says how the house meets the ask." |

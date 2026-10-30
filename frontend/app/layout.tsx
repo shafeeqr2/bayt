@@ -35,7 +35,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 <Link href="/" className="text-muted hover:text-foreground">
                   Homes
                 </Link>
-                <Link href="/invest" className="text-muted hover:text-foreground">
+                <Link href="/?persona=investor&sort=fit" className="text-muted hover:text-foreground">
                   Invest
                 </Link>
               </nav>
