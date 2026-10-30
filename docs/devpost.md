@@ -9,8 +9,9 @@ Bayt
 
 ## Tagline (short)
 
-House search that knows why you like a house. Every Toronto listing is read by
-Nemotron, scored for 4 kinds of buyer, and matched to homes "like this, but..."
+Search by taste, not by filters. Every Toronto listing is read by Nemotron, scored
+for 4 kinds of buyer, and matched to the homes you would love, with the reason
+written down. Taste Match, Build Check, Precedent Check, Floor Sketch, Taste Profile.
 
 ## Links
 
@@ -198,21 +199,10 @@ What cost us time, with suggestions:
    example names only one Qwen model, though Nemotron 3.5 Super VL accepts
    `image_url` data URLs fine.
 
-## Video script (under 3 minutes)
+## Video script
 
-Record the screen at 1920x1080 in a browser with no bookmarks bar. Voice over
-the recording, no music. Do not show the REALTOR.ca logo or links. Cut each shot
-on the action.
-
-| Time | On screen | Say |
-|---|---|---|
-| 0:00 | Search page, Toronto homes | "This is Bayt, a house search for Toronto. Two thousand two hundred listings. Every one of them has been read by NVIDIA Nemotron on Nebius Token Factory." |
-| 0:15 | Set "I am a: Investor", sort "Best fit", click Search | "Say who you are. An investor. Sort by best fit. Each card now shows how well the house fits an investor, one to ten." |
-| 0:35 | Open 39 Rhydwen Avenue | "Open one. Under the price, four scores, one to ten, for a first-time buyer, an investor, a flipper and a builder. The same house, four reasons." |
-| 0:55 | Click "More like this", Investor active | "More like this, for an investor. Eight houses in the same price band within five kilometres, ranked by Nemotron, with one reason each. Two rentable doors, seven percent yield, multiplex zone." |
-| 1:20 | Click First-time buyer chip | "Switch to first-time buyer. Different houses, different reasons: move-in ready, parking, updated kitchen." |
-| 1:35 | Type "bigger backyard and a garage", click Find homes like this | "Now steer it. Like this, but a bigger backyard and a garage. Nemotron rewrites what we are looking for, the search runs again, and every reason says how the house meets the ask." |
-| 2:00 | Turn the Money chip off | "Turn money off to search every price. Location off to search the whole city." |
-| 2:12 | Scroll to "What could you build here?", type a plan, click Check | "And because buyers want clarity, Bayt reads the zoning. Keep the house, add a second storey. The answer cites the by-law and the lot analysis." |
-| 2:35 | README "AI models" section | "All of it runs on Nebius Token Factory with NVIDIA Nemotron. The whole catalogue was profiled in seventy-eight minutes for about eight dollars. The code is open source." |
-| 2:50 | Search page again | "Bayt. House search that knows why you like a house." |
+The narrated script, one line per scene, lives next to the video in
+`frontend/public/pitch/script.md` (2:58, generated voice, live recordings of the
+site, animated Taste Match and Precedent Check diagrams, a models scene with the
+NVIDIA models tagged). The video itself is `frontend/public/pitch/bayt.mp4` and is
+embedded at https://bayt.andalsolutions.com/pitch.
