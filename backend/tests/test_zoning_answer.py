@@ -258,6 +258,7 @@ def test_make_client_is_none_without_a_key(monkeypatch):
         ("sk-ant-abc", "anthropic", "anthropic", "claude-opus-5-5"),
         ("sk-or-v1-abc", "openrouter", "openai", "nvidia/nemotron-3-super-120b-a12b"),
         ("nvapi-abc", "nvidia", "openai", "nvidia/nemotron-3-super-120b-a12b"),
+        ("v1.CmIabc", "nebius", "openai", "nvidia/nemotron-3-super-120b-a12b"),
     ],
 )
 def test_provider_from_key_prefix(monkeypatch, key, provider, kind, model):
@@ -335,3 +336,24 @@ def test_openai_backend_failures_become_model_unavailable(status, payload, messa
     backend = openai_backend(lambda request: httpx.Response(status, json=payload))
     with pytest.raises(m.ModelUnavailable, match=message):
         backend.structured(system="s", user="u", schema=m.ParsedIntent, effort="low", max_tokens=100)
+
+
+def test_nebius_backend_turns_thinking_off_unless_effort_is_high():
+    seen = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(json.loads(request.content))
+        return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps({"colour": "red", "rooms": 4})}, "finish_reason": "stop"}]})
+
+    from pydantic import BaseModel
+
+    class Shape(BaseModel):
+        colour: str
+        rooms: int
+
+    backend = m.OpenAIBackend("v1.CmIx", "https://api.tokenfactory.nebius.com/v1", "nvidia/Nemotron-3_5-Lightning", "nebius", transport=httpx.MockTransport(handler))
+    backend.structured(system="s", user="u", schema=Shape, effort="low", max_tokens=50)
+    backend.structured(system="s", user="u", schema=Shape, effort="high", max_tokens=50)
+    assert seen[0]["chat_template_kwargs"] == {"enable_thinking": False}
+    assert seen[1]["chat_template_kwargs"] == {"enable_thinking": True}
+    assert "reasoning" not in seen[0] and "provider" not in seen[0]

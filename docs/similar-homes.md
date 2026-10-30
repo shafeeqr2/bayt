@@ -41,11 +41,16 @@ profiles` for all of them. Opening a listing page never calls the model.
 
 | Provider | Profile model | Embedding model |
 |---|---|---|
+| Nebius Token Factory (`v1.`) | `nvidia/Nemotron-3.5-Super-VL` | `Qwen/Qwen3-Embedding-8B`, asked for 2,048 of its 4,096 dims |
 | OpenRouter (`sk-or-`) | `nvidia/nemotron-3.5-super-vl:free` | `nvidia/nemotron-3.5-embed-1b:free` |
 | NVIDIA NIM (`nvapi-`) | `nvidia/nemotron-3.5-super-vl` | `nvidia/llama-3.2-nv-embedqa-1b-v2` |
 | Anthropic (`sk-ant-`) | `claude-opus-5-5` | none: pitches are stored but not searchable |
 
-`PROFILE_MODEL` and `EMBED_MODEL` in `.env` override these. The free listings on
+`PROFILE_MODEL` and `EMBED_MODEL` in `.env` override these. Bayt runs on Token
+Factory: the profile call with 8 photos takes about 6 s with thinking turned off
+(`chat_template_kwargs.enable_thinking: false`, else the model spends the whole
+budget reasoning and returns nothing), the whole catalogue costs under $5, and the
+rate limit is 60 requests a minute that grows with use. The free listings on
 OpenRouter answer the profile call in about 9 s with 8 photos and under 1 s
 without, cost nothing, and allow about 1,000 requests a day on an account with
 credits. The backfill takes Toronto houses first, then townhouses, then condos,

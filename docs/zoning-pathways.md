@@ -191,6 +191,7 @@ one of 2 backends, picked from the key in `LLM_API_KEY`:
 
 | Key prefix | Provider | Backend | Default `ZONING_MODEL` |
 |---|---|---|---|
+| `v1.` | Nebius Token Factory | `OpenAIBackend`: OpenAI-style `chat/completions` with `response_format` json_schema; thinking off through `chat_template_kwargs` | `nvidia/nemotron-3-super-120b-a12b` |
 | `sk-ant-` | Anthropic | `AnthropicBackend`: the official SDK, `client.messages.parse` | `claude-opus-5-5` |
 | `sk-or-` | OpenRouter | `OpenAIBackend`: OpenAI-style `chat/completions` with `response_format` json_schema | `nvidia/nemotron-3-super-120b-a12b` |
 | `nvapi-` | NVIDIA NIM (build.nvidia.com) | `OpenAIBackend` | `nvidia/nemotron-3-super-120b-a12b` |

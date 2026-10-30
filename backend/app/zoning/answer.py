@@ -129,9 +129,11 @@ PROVIDERS = {
     "anthropic": Provider("anthropic", "anthropic", None, "claude-opus-5-5"),
     "openrouter": Provider("openrouter", "openai", "https://openrouter.ai/api/v1", "nvidia/nemotron-3-super-120b-a12b"),
     "nvidia": Provider("nvidia", "openai", "https://integrate.api.nvidia.com/v1", "nvidia/nemotron-3-super-120b-a12b"),
+    # Nebius Token Factory serves the NVIDIA Nemotron models on the same OpenAI-style API; keys start with "v1.".
+    "nebius": Provider("nebius", "openai", "https://api.tokenfactory.nebius.com/v1", "nvidia/nemotron-3-super-120b-a12b"),
     "openai": Provider("openai", "openai", None, ""),
 }
-KEY_PREFIXES = (("sk-ant-", "anthropic"), ("sk-or-", "openrouter"), ("nvapi-", "nvidia"))
+KEY_PREFIXES = (("sk-ant-", "anthropic"), ("sk-or-", "openrouter"), ("nvapi-", "nvidia"), ("v1.", "nebius"))
 
 
 def resolve_provider(key: str | None = None, provider: str | None = None) -> Provider | None:
@@ -219,7 +221,7 @@ _FENCE = re.compile(r"^\s*```(?:json)?\s*|\s*```\s*$", re.S)
 class OpenAIBackend:
     """OpenAI-style `POST {base_url}/chat/completions` with `response_format` json_schema.
 
-    This is how OpenRouter and NVIDIA NIM serve the Nemotron models. The JSON comes
+    This is how Nebius Token Factory, OpenRouter and NVIDIA NIM serve the Nemotron models. The JSON comes
     back as the message text; it is validated with the pydantic schema here, so a
     provider that ignores the schema still cannot slip a wrong shape through.
 
@@ -280,6 +282,11 @@ class OpenAIBackend:
             # The answer is ~1,000 output tokens, so the host's output speed is most of the wait;
             # take the fastest host of the moment rather than the cheapest.
             body["provider"] = {"sort": "throughput"}
+        if self.provider == "nebius":
+            # Token Factory runs vLLM: the Nemotron models think by default and spend the whole
+            # output budget on it, so the content comes back empty. The chat template switch turns
+            # thinking off for the "write JSON from given material" calls made here.
+            body["chat_template_kwargs"] = {"enable_thinking": effort in ("high", "xhigh", "max")}
         try:
             response = self._http.post(self._url, json=body)
         except httpx.HTTPError as exc:

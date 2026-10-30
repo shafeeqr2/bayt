@@ -109,6 +109,7 @@ the note that this is a photograph; a second `floor_plan` becomes `other`.
 
 | Provider | Default vision model |
 |---|---|
+| Nebius Token Factory (`v1.`) | `nvidia/Nemotron-3.5-Super-VL`, with thinking turned off through `chat_template_kwargs` |
 | OpenRouter (`sk-or-`) | `nvidia/nemotron-3.5-super-vl:free` (the free listing of the same model) |
 | NVIDIA NIM (`nvapi-`) | `nvidia/nemotron-3.5-super-vl` |
 | Anthropic (`sk-ant-`) | `claude-opus-5-5` |

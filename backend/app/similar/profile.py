@@ -48,6 +48,7 @@ DESCRIPTION_CHARS = 2500
 MEDIAN_MIN_COUNT = 5  # a community median needs this many comparable listings, else the city's
 # Text-and-vision models per provider. The profile call sends photos, so it needs a vision model.
 DEFAULT_MODELS = {
+    "nebius": "nvidia/Nemotron-3.5-Super-VL",
     "openrouter": "nvidia/nemotron-3.5-super-vl:free",
     "nvidia": "nvidia/nemotron-3.5-super-vl",
     "anthropic": "claude-opus-5-5",

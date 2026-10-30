@@ -6,9 +6,9 @@ Source: the Claude Docs version at https://claude.ai/artifact/TE2j5ZxRp91wHNo8P6
 
 As built on 2026-10-28 (phases 1 and 2, see `docs/similar-homes.md`), 3 details differ from this plan:
 
-- The embedding is 2048 floats, not 1024. The free NVIDIA model `nvidia/nemotron-3.5-embed-1b:free` returns 2048.
+- The embedding is 2048 floats, not 1024. On Nebius Token Factory `Qwen/Qwen3-Embedding-8B` is asked for 2048 of its 4096 dims; the free NVIDIA model on OpenRouter returns 2048 natively.
 - There are 3 new tables, not 2. `similar_results` holds the 24 h rerank cache.
-- Only NVIDIA models are used, on the free OpenRouter listings. The profile and rerank model is `nvidia/nemotron-3.5-super-vl:free`.
+- The profile, rerank and steering model is NVIDIA's `nvidia/Nemotron-3.5-Super-VL`, served by Nebius Token Factory since 2026-10-30 (the first build used the free OpenRouter listing of the same model).
 
 ## Goal
 

@@ -230,3 +230,19 @@ def test_request_hash_changes_with_the_steering():
     assert a == sv._request_hash("investor", cands, "m", st.DEFAULT)
     assert a != sv._request_hash("investor", cands, "m", st.parse("bigger yard", None))
     assert a != sv._request_hash("investor", cands, "m", st.parse(None, "layout"))
+
+
+def test_nebius_defaults_and_the_embedding_dimensions(monkeypatch):
+    monkeypatch.setattr(hp.settings, "profile_model", "")
+    monkeypatch.setattr(em.settings, "embed_model", "")
+    monkeypatch.setattr(hp.settings, "llm_api_key", "v1.CmIx")
+    assert hp.model_name() == "nvidia/Nemotron-3.5-Super-VL"
+    assert em.model_name() == "Qwen/Qwen3-Embedding-8B"
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["body"] = json.loads(request.content)
+        return httpx.Response(200, json={"data": [{"index": 0, "embedding": [0.0] * em.EMBEDDING_DIM}]})
+
+    em.EmbeddingClient("v1.CmIx", "https://api.tokenfactory.nebius.com/v1", "Qwen/Qwen3-Embedding-8B", "nebius", transport=httpx.MockTransport(handler)).embed(["a"])
+    assert seen["body"]["dimensions"] == em.EMBEDDING_DIM and "input_type" not in seen["body"]

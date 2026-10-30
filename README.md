@@ -37,6 +37,23 @@ The backend source is mounted into its container, so Python changes reload autom
 
 The frontend talks to the API from the server side only, using `BACKEND_URL` (set by `./start.sh`).
 
+## AI models: NVIDIA Nemotron on Nebius Token Factory
+
+Every model call in Bayt goes through [Nebius Token Factory](https://tokenfactory.nebius.com) and uses NVIDIA's open Nemotron models. Put a Token Factory key in `.env` as `LLM_API_KEY` (they start with `v1.`); nothing else is needed. The models are open weights, so the same code also runs against NVIDIA NIM or OpenRouter, and `LLM_BASE_URL` points it at any OpenAI-style endpoint.
+
+| What | Model on Token Factory | Calls |
+|---|---|---|
+| House profile: facts and 4 buyer-persona views, read from the listing, the city data and up to 8 photos | `nvidia/Nemotron-3.5-Super-VL` | 1 per listing, about 6 s, run by `./start.sh profiles` |
+| Similar homes: rerank 30 nearest houses for one buyer, 1 reason line each | `nvidia/Nemotron-3.5-Super-VL` | 1 per listing page and persona, cached 24 h |
+| Steering: rewrite the pitch for "like this, but bigger backyard" | `nvidia/Nemotron-3.5-Super-VL` | 1 per typed ask, cached 24 h |
+| Photo labels: a title, a sentence and floor-plan facts per photo | `nvidia/Nemotron-3.5-Super-VL` | 1 per listing with all photos |
+| Zoning answer: read the plan from plain words, write the cited answer | `nvidia/nemotron-3-super-120b-a12b` | 2 per new question, cached |
+| Pitch embeddings for the nearest-neighbour search (pgvector, 2,048 dims) | `Qwen/Qwen3-Embedding-8B` | 200 pitches per request |
+
+Why Token Factory mattered: the whole catalogue, 2,261 houses and 9,044 persona pitches, is profiled and embedded in about 1 hour for under $5, and a listing page answers in 1 to 6 s. The Nemotron models think by default on Token Factory, so the backend sends `chat_template_kwargs: {enable_thinking: false}` for these "write JSON from the given material" calls; they come back in under a second instead of spending the token budget on reasoning. Structured output is `response_format` JSON with the pydantic schema checked on our side.
+
+Design notes: [`docs/similar-homes.md`](docs/similar-homes.md), [`docs/photo-labels.md`](docs/photo-labels.md), [`docs/zoning-pathways.md`](docs/zoning-pathways.md).
+
 ## Everyday commands
 
 ```bash
@@ -199,7 +216,7 @@ A vision model reads each listing photo and returns a title, one sentence about 
 curl -X POST http://localhost:8000/api/listings/30401713/photos/read
 ```
 
-Default model: `nvidia/nemotron-3.5-super-vl` on OpenRouter, about 8 s and 2 cents for 50 photos. See `docs/photo-labels.md`.
+Default model: `nvidia/Nemotron-3.5-Super-VL` on Nebius Token Factory, about 8 s and 2 cents for 50 photos. See `docs/photo-labels.md`.
 
 ## Zoning pathways
 
@@ -216,7 +233,7 @@ curl -X POST http://localhost:8000/api/listings/30403339/zoning/ask \
   -d '{"mode": "buyer", "text": "Keep the house and add a third storey about 10.5 m high"}'
 ```
 
-With `LLM_API_KEY` in `.env`, the `ask` endpoint (and the form) reads the plan from plain words and writes a short answer in which every paragraph cites a route, a by-law clause, a standard or a nearby file from the analysis; paragraphs that cite nothing in it are dropped. The provider follows the key: an Anthropic key (`sk-ant-`) uses Claude through the Anthropic SDK; an OpenRouter key (`sk-or-`) or an NVIDIA key (`nvapi-`) uses an NVIDIA Nemotron model through the OpenAI-style chat API. `ZONING_MODEL` picks another model. A new question takes about 5 s, a repeated plan under 1 s. The zoning check also draws as a schematic model: the lot, the planned box, the most the by-law allows, and 1 line per standard in green, orange or grey, with a plain-words card on hover. Without a key the form still works on the detail fields and shows the deterministic result.
+With `LLM_API_KEY` in `.env`, the `ask` endpoint (and the form) reads the plan from plain words and writes a short answer in which every paragraph cites a route, a by-law clause, a standard or a nearby file from the analysis; paragraphs that cite nothing in it are dropped. The provider follows the key: a Nebius Token Factory key (`v1.`), an NVIDIA NIM key (`nvapi-`) or an OpenRouter key (`sk-or-`) uses an NVIDIA Nemotron model through the OpenAI-style chat API; an Anthropic key (`sk-ant-`) uses Claude through the Anthropic SDK. `ZONING_MODEL` picks another model. A new question takes about 5 s, a repeated plan under 1 s. The zoning check also draws as a schematic model: the lot, the planned box, the most the by-law allows, and 1 line per standard in green, orange or grey, with a plain-words card on hover. Without a key the form still works on the detail fields and shows the deterministic result.
 
 Once `./start.sh city-data` has loaded the Committee of Adjustment open data (every minor variance and consent application since 2001, placed on the city's address points), the answer also shows what the committee decided on comparable files near the lot, and the listing page lists the nearest decisions. The open data has the decision and the description, not the variance table.
 
@@ -258,5 +275,8 @@ If the same listing appears in several files, the newest file wins.
 Photos are not stored locally.
 The database keeps REALTOR.ca's photo URLs, which stop working when a listing comes off the market.
 
-This data is scraped from REALTOR.ca for internal prototyping only.
-Keep the repo private, and do not publish the data or photos.
+This data is scraped from REALTOR.ca for prototyping only. The photos stay on REALTOR.ca's CDN; nothing is copied.
+
+## License
+
+MIT, see [`LICENSE`](LICENSE). The licence covers the code. The listing data under `backend/seed/` belongs to its publishers and is included for evaluation only.

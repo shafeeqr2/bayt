@@ -1,7 +1,8 @@
 """Embeddings for the persona pitches: one vector per (listing, persona), stored next to the pitch.
 
-OpenRouter and NVIDIA NIM serve embedding models on the OpenAI-style
-`POST {base_url}/embeddings`. The vectors go in `listing_persona_profiles.embedding`
+Nebius Token Factory, OpenRouter and NVIDIA NIM serve embedding models on the
+OpenAI-style `POST {base_url}/embeddings`. Token Factory's model returns 4,096 floats
+by default and takes a `dimensions` parameter, so it is asked for `EMBEDDING_DIM`. The vectors go in `listing_persona_profiles.embedding`
 (pgvector, `EMBEDDING_DIM` floats) with the model's name, so a model change
 re-embeds and a search never mixes two models' spaces.
 
@@ -25,6 +26,7 @@ from app.zoning import answer as llm
 
 BATCH = 200  # texts per request; 50 listings x 4 personas
 DEFAULT_MODELS = {
+    "nebius": "Qwen/Qwen3-Embedding-8B",  # Token Factory serves no NVIDIA embedding model; the pitches are text either way
     "openrouter": "nvidia/nemotron-3.5-embed-1b:free",
     "nvidia": "nvidia/llama-3.2-nv-embedqa-1b-v2",
     "anthropic": "",  # Anthropic serves no embedding model
@@ -49,6 +51,8 @@ class EmbeddingClient:
         body: dict[str, Any] = {"model": self.model, "input": texts}
         if self.provider == "nvidia":
             body["input_type"] = "passage"  # NIM's retrieval models need to know which side of the search this is
+        if self.provider == "nebius":
+            body["dimensions"] = EMBEDDING_DIM
         try:
             response = self._http.post(self._url, json=body)
         except httpx.HTTPError as exc:
