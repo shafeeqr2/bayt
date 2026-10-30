@@ -189,24 +189,24 @@ Each gate is a check a person does by hand before the next phase starts. Duratio
 
 **Phase 1: Profiles. About 2 weeks.**
 
-- [ ] Add pgvector to the `db` image and 1 migration for `listing_profiles` and `listing_persona_profiles`
-- [ ] Write the profile prompt with the fact schema and 4 persona rubrics, versioned like the photo prompt
-- [ ] Add the embedding client with the model name stored next to each vector
-- [ ] Add `POST /api/listings/{id}/profile` and a backfill command for the 2,300 seed listings
+- [x] Add pgvector to the `db` image and 1 migration for `listing_profiles` and `listing_persona_profiles`
+- [x] Write the profile prompt with the fact schema and 4 persona rubrics, versioned like the photo prompt
+- [x] Add the embedding client with the model name stored next to each vector
+- [x] Add `POST /api/listings/{id}/profile` and a backfill command for the 2,300 seed listings
 - [ ] Gate: read 50 profiles by hand, fix the rubric until the scores match the reader's view
 
 **Phase 2: Similar row. About 2 weeks.**
 
-- [ ] Add `GET /api/listings/{id}/similar` with persona, filters, kNN top 30, rerank, and a 24 hour cache
-- [ ] Render the row on the listing page with the persona toggle and 1 reason line per card
+- [x] Add `GET /api/listings/{id}/similar` with persona, filters, kNN top 30, rerank, and a 24 hour cache
+- [x] Render the row on the listing page with the persona toggle and 1 reason line per card
 - [ ] Show the kNN order at once and swap in the reranked order when it arrives
 - [ ] Gate: 100 pair judgments from 2 people, at least 70% agree with the top 5
 
 **Phase 3: Steering. About 1 week.**
 
-- [ ] "Like this, but..." text box that rewrites the pitch and re-runs retrieval
-- [ ] 5 facet chips passed to the rerank prompt
-- [ ] Score badge on the listing header and the search cards, with the search card link
+- [x] "Like this, but..." text box that rewrites the pitch and re-runs retrieval
+- [x] 5 facet chips passed to the rerank prompt
+- [x] Score badge on the listing header and the search cards, with the search card link
 - [ ] Gate: 10 steering trials, the results change in the asked direction in 9
 
 **Phase 4: Session taste. About 1 week.**

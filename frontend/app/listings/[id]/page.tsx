@@ -2,17 +2,19 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
-import { getListing, getPhotoLabels, PERSONA_LABELS, PERSONAS, type PersonaKey } from "@/lib/api";
+import { getListing, getPhotoLabels, PERSONA_LABELS, PERSONAS } from "@/lib/api";
 import { formatParking, formatPrice, formatSqft } from "@/lib/format";
 import { CitySection } from "./city-section";
 import { FloorPlanSection } from "./floor-plan";
 import { Gallery } from "./gallery";
 import { SimilarRow } from "./similar-row";
+import { parseSteer, similarHref } from "./steer";
 import { PotentialChips } from "../../potential-chips";
 
 export default async function ListingPage({ params, searchParams }: PageProps<"/listings/[id]">) {
   const [{ id }, query] = await Promise.all([params, searchParams]);
-  const persona: PersonaKey = PERSONAS.includes(query.persona as PersonaKey) ? (query.persona as PersonaKey) : "first_time_buyer";
+  const steer = parseSteer(query);
+  const persona = steer.persona;
   const [listing, photoLabels] = await Promise.all([getListing(id), getPhotoLabels(id)]);
   if (!listing) notFound();
 
@@ -71,7 +73,7 @@ export default async function ListingPage({ params, searchParams }: PageProps<"/
                   return (
                     <Link
                       key={key}
-                      href={`?persona=${key}#similar`}
+                      href={similarHref({ ...steer, persona: key })}
                       scroll={true}
                       className={`rounded-full border px-3 py-1 text-sm tabular-nums transition-colors ${
                         active ? "border-foreground bg-foreground text-background" : "border-border bg-surface hover:border-foreground/40"
@@ -135,7 +137,7 @@ export default async function ListingPage({ params, searchParams }: PageProps<"/
 
       {/* The similar homes answer is one cached model call on the backend, so it streams in. */}
       <Suspense fallback={<div className="h-64 animate-pulse rounded-xl bg-border" />}>
-        <SimilarRow id={listing.id} persona={persona} />
+        <SimilarRow id={listing.id} steer={steer} />
       </Suspense>
 
       <div className="max-w-4xl">

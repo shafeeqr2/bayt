@@ -150,3 +150,83 @@ def test_default_models_follow_the_provider(monkeypatch):
     assert em.model_name() == "nvidia/nemotron-3.5-embed-1b:free"
     monkeypatch.setattr(hp.settings, "llm_api_key", "sk-ant-x")
     assert em.make_client() is None  # Anthropic serves no embedding model
+
+
+# -- steering: the typed change and the facet chips ---------------------------------------------------
+
+from app.similar import steer as st  # noqa: E402
+
+
+def test_parse_steering_cleans_the_text_and_checks_the_facets():
+    s = st.parse("  bigger   backyard ", None)
+    assert s.text == "bigger backyard" and s.facets == st.FACETS and s.off == () and s.is_default is False
+    s = st.parse("", "lot, layout")
+    assert s.text is None and s.facets == ("layout", "lot") and s.off == ("finish", "location", "money")
+    assert st.parse(None, None).is_default
+    assert st.parse("x" * 300, None).text == "x" * 200
+    with pytest.raises(ValueError, match="unknown facet 'view'"):
+        st.parse(None, "layout,view")
+    with pytest.raises(ValueError, match="at least 1"):
+        st.parse(None, "")
+
+
+def test_a_facet_off_drops_its_filter():
+    def words(s):
+        return [w for _, w in sv.filter_tiers(listing(), s)]
+
+    band = "price within 25% of $1,270,000"
+    assert words(st.DEFAULT) == [[band, "within 5 km"], [band, "any distance"], ["any price", "any distance"]]
+    assert words(st.parse(None, "layout,finish,lot,money")) == [[band, "any distance (location off)"], ["any price", "any distance (location off)"]]
+    assert words(st.parse(None, "layout,location")) == [["any price (money off)", "within 5 km"], ["any price (money off)", "any distance"]]
+    assert words(st.parse(None, "layout")) == [["any price (money off)", "any distance (location off)"]]
+    assert len(sv.filter_tiers(listing(latitude=None), st.DEFAULT)) == 2  # no location: no radius tier
+
+
+def test_rerank_prompt_carries_the_ask_and_the_facets():
+    src, cands = rows()
+    s = st.parse("bigger backyard", "layout,lot")
+    text = sv.rerank_prompt(listing(), src, {"summary": "A bungalow."}, cands, s, ("A bungalow with a deep yard.", ["deep fenced yard"]))
+    assert "What the buyer is asking for" in text and "pitch: A bungalow with a deep yard." in text
+    assert "Compare on: layout (" in text and "Ignore: finish, location, money." in text
+    assert 'The buyer asked for a change: "bigger backyard"' in text
+    assert "lot 50 x 111 FT, 4 parking (Attached Garage)" in text
+    plain = sv.rerank_prompt(listing(), src, None, cands)
+    assert "Ignore:" not in plain and "asked for" not in plain and "Compare on: layout" in plain
+
+
+def test_rewrite_scrubs_the_address_and_drops_empty_signals():
+    src, _ = rows()
+    answer = st.Rewrite(pitch="Two doors  at 82 Renault Crescent with a deep yard.", signals=["deep yard", " ", "garage"])
+    client = SimpleNamespace(model="m", structured=lambda **kw: answer)
+    pitch, signals = st.rewrite(client, listing(), src, None, "bigger backyard")
+    assert pitch == "Two doors at the property with a deep yard." and signals == ["deep yard", "garage"]
+
+
+def test_ask_retries_once_on_a_dropped_connection_and_not_on_a_rate_limit():
+    calls = []
+
+    def flaky(**kw):
+        calls.append(1)
+        if len(calls) == 1:
+            raise llm.ModelUnavailable("the model call failed: ReadError")
+        return st.Rewrite(pitch="ok", signals=[])
+
+    out = st.ask(SimpleNamespace(structured=flaky), system="s", user="u", schema=st.Rewrite, max_tokens=5)
+    assert isinstance(out, st.Rewrite) and out.pitch == "ok" and len(calls) == 2
+
+    def limited(**kw):
+        calls.append(1)
+        raise llm.ModelUnavailable("the model is rate limited")
+
+    calls.clear()
+    with pytest.raises(llm.ModelUnavailable, match="rate limited"):
+        st.ask(SimpleNamespace(structured=limited), system="s", user="u", schema=st.Rewrite, max_tokens=5)
+    assert len(calls) == 1
+
+
+def test_request_hash_changes_with_the_steering():
+    src, cands = rows()
+    a = sv._request_hash("investor", cands, "m")
+    assert a == sv._request_hash("investor", cands, "m", st.DEFAULT)
+    assert a != sv._request_hash("investor", cands, "m", st.parse("bigger yard", None))
+    assert a != sv._request_hash("investor", cands, "m", st.parse(None, "layout"))

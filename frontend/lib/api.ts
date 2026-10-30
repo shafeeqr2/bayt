@@ -452,6 +452,13 @@ export type HouseProfile = {
   computed_at: string | null;
 };
 
+export const FACETS = ["layout", "finish", "lot", "location", "money"] as const;
+export type FacetKey = (typeof FACETS)[number];
+export const FACET_LABELS: Record<FacetKey, string> = { layout: "Layout", finish: "Finish", lot: "Lot", location: "Location", money: "Money" };
+
+/** What the buyer asked the similar row to do: who they are, what to change, what to compare on (undefined = all). */
+export type Steer = { persona: PersonaKey; text?: string; facets?: FacetKey[] };
+
 export type SimilarHome = {
   listing: ListingSummary;
   score: number;
@@ -474,6 +481,10 @@ export type SimilarHomes = {
   reranked: boolean;
   cached: boolean;
   note: string | null;
+  steer: string | null;
+  facets: FacetKey[];
+  target: string | null;
+  steered: boolean;
 };
 
 /** The stored house profile (facts + 4 persona views). Never triggers a model call. */
@@ -481,7 +492,10 @@ export async function getHouseProfile(id: string): Promise<HouseProfile | null> 
   return get(`/api/listings/${encodeURIComponent(id)}/profile`);
 }
 
-/** Similar homes for one persona. One cached rerank call on the backend when the profile exists. */
-export async function getSimilarHomes(id: string, persona: PersonaKey): Promise<SimilarHomes | null> {
-  return get(`/api/listings/${encodeURIComponent(id)}/similar?persona=${persona}`);
+/** Similar homes for one persona, steered by the typed change and the facets. Cached model calls on the backend. */
+export async function getSimilarHomes(id: string, steer: Steer): Promise<SimilarHomes | null> {
+  const params = new URLSearchParams({ persona: steer.persona });
+  if (steer.text) params.set("steer", steer.text);
+  if (steer.facets && steer.facets.length < FACETS.length) params.set("facets", steer.facets.join(","));
+  return get(`/api/listings/${encodeURIComponent(id)}/similar?${params}`);
 }

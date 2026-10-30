@@ -19,6 +19,7 @@ from app.models import Listing, ListingCityData, ListingInvestment, ListingPerso
 from app.photos import reader as photo_reader
 from app.similar import profile as house_profile
 from app.similar import service as similar_service
+from app.similar import steer as steer_mod
 from app.schemas import (
     CityData,
     Facets,
@@ -424,17 +425,27 @@ def get_listing_similar(
     persona: house_profile.Persona = "first_time_buyer",
     limit: Annotated[int, Query(ge=1, le=similar_service.RESULTS)] = similar_service.RESULTS,
     rerank: bool = True,
+    steer: Annotated[str | None, Query(max_length=steer_mod.MAX_TEXT, description='The change the buyer asked for: "bigger backyard"')] = None,
+    facets: Annotated[str | None, Query(description="Comma list of the facets to compare on; default all of layout, finish, lot, location, money")] = None,
 ) -> similar_service.SimilarHomes:
     """Homes similar to this one for one persona: filters, nearest pitches, one reranked and explained list.
 
     The rerank is one model call, cached for a day per candidate set. `rerank=false`
     returns the nearest-neighbour order with reasons from the shared signals and never
     calls the model. A listing without a profile gets an empty list and a `note`.
+
+    `steer` is the buyer's typed change: one model call rewrites the source pitch with it
+    applied and the search runs from that text (cached too). `facets` drops facets from
+    the comparison; location and money also drop their hard filter.
     """
     listing = session.get(Listing, listing_id)
     if listing is None:
         raise HTTPException(status_code=404, detail="Listing not found")
-    return similar_service.similar(session, listing, persona, use_model=rerank, limit=limit)
+    try:
+        steering = steer_mod.parse(steer, facets)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return similar_service.similar(session, listing, persona, use_model=rerank, limit=limit, steering=steering)
 
 
 @app.get("/api/lot")

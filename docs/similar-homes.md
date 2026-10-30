@@ -7,7 +7,7 @@ reasons, so "similar" is computed 4 times, once per persona, and the buyer picks
 the persona with a toggle on the listing page.
 
 The plan this follows is `docs/similar-homes-plan.md`. This file says what was
-built in phases 1 and 2 and how it behaves.
+built in phases 1 to 3 and how it behaves.
 
 ## The house profile (phase 1)
 
@@ -98,11 +98,48 @@ profile is written), fetched in 1 query per page:
 - **Listing header** shows the 4 scores as chips; each one links to the similar
   row for that buyer.
 
+## Steering (phase 3)
+
+The buyer can say what to change and what counts. Both controls live in the page
+URL (`?steer=&facets=`), so the row stays a server component, and both feed the same
+pipeline: no new model, no new embeddings. The code is `app.similar.steer`.
+
+**"Like this, but..."** One text box, 200 characters at most. One model call rewrites
+the source's persona pitch with the change applied: the pitch of the house the buyer
+is asking for, same voice and length, no address or price (the scrub runs on it as on
+a stored pitch). That text is embedded with the same model as the catalogue and the
+nearest-neighbour search runs from it instead of from the source's own vector. The
+rerank call shows the rewritten target and gets the ask as a constraint: candidates
+that deliver it rank first and their reason says how. The rewrite and its vector are
+cached in `similar_results` for 24 hours (keyed by the persona, the text, the source
+pitch and both models), so a steered page costs 3 calls the first time (rewrite,
+embed, rerank) and 0 after. When the rewrite fails the search runs from the source
+vector and the ask still reaches the rerank; the `note` says so.
+
+The rerank lines also carry each house's lot size and parking, because the pitches
+rarely mention them and the typed asks often do ("bigger backyard", "a garage").
+
+**Facets.** 5 chips, all on by default: layout, finish, lot, location, money. A chip
+off tells the rerank what to ignore (the prompt lists the active facets with what
+each covers) and, for the 2 facets that are also hard filters, drops the filter:
+location off removes the 5 km radius, money off removes the 25% price band. At least
+1 chip stays on. `GET /api/listings/{id}/similar?facets=layout,lot` is the API form;
+an unknown facet or an empty list is a 422.
+
+**What a typed ask can reach.** The rewrite can only ask for what the profiles
+describe. "Bigger backyard and a garage" moves the results, because lots and parking
+are in the facts and in the rerank lines. "Closer to the subway" does not, because
+no profile knows where the subway is; the ranking then falls back to the persona's
+usual reasons. Transit, schools and walk scores would need a data source first.
+
+Gate 3 of the plan (10 steering trials, 9 move the asked way) is not done yet.
+
 ## Checks
 
 `tests/test_similar.py` covers the prompt blocks, the scrub and clamp, the
 embedding client (batching, dimension check, NIM's `input_type`), the rerank id
-guard, the fallback reasons and the cache key.
+guard, the fallback reasons, the cache key, the steering parser, the facet filter
+tiers, the rewrite scrub and the retry rule.
 
 Gate 1 of the plan (50 profiles read by hand, rubric fixed) and gate 2 (100 pair
 judgments, 70% agreement with the top 5) are not done yet.
