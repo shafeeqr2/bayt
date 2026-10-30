@@ -441,6 +441,7 @@ def write_profile(
     row.prompt_version = PROMPT_VERSION
     row.facts = profile.facts.model_dump() if profile else None
     row.note = note
+    row.computed_at = func.now()  # a repeat failure with the same note changes nothing else, so stamp the time by hand
     if profile is not None:
         views = persona_rows(session, listing.id)
         for p in PERSONAS:
