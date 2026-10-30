@@ -1,0 +1,15 @@
+# Local development only. Compose merges this file into docker-compose.yml on its
+# own when you run `docker compose` or `./start.sh` with no -f flags.
+# Production uses docker-compose.prod.yml instead and never loads this file.
+
+services:
+  db:
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+
+  backend:
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    volumes:
+      # Python changes reload in the container without a rebuild.
+      - ./backend:/app

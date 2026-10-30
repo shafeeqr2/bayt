@@ -1,5 +1,10 @@
 name: bayt
 
+# Base definition shared by local development and production.
+# Development adds host ports and the backend bind mount in docker-compose.override.yml
+# (Compose loads it on its own). Production adds the frontend and Caddy in
+# docker-compose.prod.yml (see docs/deploy.md).
+
 services:
   db:
     build: ./db
@@ -8,8 +13,6 @@ services:
       POSTGRES_USER: bayt
       POSTGRES_PASSWORD: bayt
       POSTGRES_DB: bayt
-    ports:
-      - "${POSTGRES_PORT:-5433}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -31,10 +34,6 @@ services:
       PHOTO_MODEL: ${PHOTO_MODEL:-}
       PROFILE_MODEL: ${PROFILE_MODEL:-}
       EMBED_MODEL: ${EMBED_MODEL:-}
-    ports:
-      - "${BACKEND_PORT:-8000}:8000"
-    volumes:
-      - ./backend:/app
     depends_on:
       db:
         condition: service_healthy

@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Production: `next build` writes a self-contained server to .next/standalone,
+  // which frontend/Dockerfile copies into the image. `next dev` ignores this.
+  output: "standalone",
   cacheComponents: true,
   partialPrefetching: true,
   images: {

@@ -72,6 +72,12 @@ Design notes: [`docs/similar-homes.md`](docs/similar-homes.md), [`docs/photo-lab
 If a port is already taken on your machine, change it in `.env` (created from `.env.example` on first run).
 Postgres is exposed on 5433 by default so it does not clash with a local Postgres on 5432.
 
+## Deploy
+
+The live site is https://bayt.andalsolutions.com: one DigitalOcean droplet runs the whole stack with Docker Compose and Caddy.
+Every push to `main` deploys it through GitHub Actions.
+See [docs/deploy.md](docs/deploy.md) for the server setup, logs, rollback, and how to copy your local database up.
+
 ## Map search
 
 The search page has a List | Map toggle (`?view=map`).

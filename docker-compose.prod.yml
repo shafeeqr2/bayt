@@ -1,0 +1,58 @@
+# Production overlay for one server. Use it on top of the base file:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# deploy/deploy.sh runs that for you, and the server's .env sets COMPOSE_FILE so a
+# plain `docker compose` there picks both files too. See docs/deploy.md.
+#
+# Nothing publishes a host port except Caddy (80 and 443). Postgres and the API are
+# reachable only on the Compose network.
+
+services:
+  db:
+    restart: unless-stopped
+
+  backend:
+    restart: unless-stopped
+    environment:
+      CORS_ORIGINS: '["https://bayt.andalsolutions.com"]'
+      # The image is immutable here; no file watcher.
+      UVICORN_RELOAD: "0"
+    healthcheck:
+      # The first boot migrates and seeds about 2,300 listings before the API
+      # answers, which takes a few minutes on a small server.
+      start_period: 180s
+      retries: 100
+
+  frontend:
+    build: ./frontend
+    image: bayt-frontend
+    restart: unless-stopped
+    environment:
+      # Read on the Next.js server at request time (frontend/lib/backend.ts).
+      BACKEND_URL: http://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    # No depends_on on purpose: Caddy resolves frontend:3000 and backend:8000 per
+    # request, so a redeploy of those does not restart Caddy or drop TLS.
+
+volumes:
+  caddy_data:
+  caddy_config:
