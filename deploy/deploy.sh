@@ -35,6 +35,18 @@ compose build --pull
 info "Starting services"
 compose up -d --remove-orphans
 
+# The Caddyfile is a single-file bind mount; git writes a new inode, so the running
+# container keeps serving the old file until it is recreated. Recreate it only when
+# the file changed, so a normal deploy does not drop TLS connections.
+if caddy_id="$(compose ps -q caddy)" && [[ -n "$caddy_id" ]]; then
+  running="$(docker exec "$caddy_id" sha256sum /etc/caddy/Caddyfile 2>/dev/null | cut -d' ' -f1 || true)"
+  wanted="$(sha256sum deploy/Caddyfile | cut -d' ' -f1)"
+  if [[ "$running" != "$wanted" ]]; then
+    info "Caddyfile changed; recreating caddy"
+    compose up -d --force-recreate caddy
+  fi
+fi
+
 info "Waiting for the API (up to $HEALTH_TIMEOUT s; the first boot seeds about 2,300 listings)"
 container="$(compose ps -q backend)"
 deadline=$((SECONDS + HEALTH_TIMEOUT))

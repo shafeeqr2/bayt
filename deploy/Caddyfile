@@ -1,20 +1,44 @@
 # Caddy config for the production server. Mounted read-only by docker-compose.prod.yml.
 # Caddy gets and renews the Let's Encrypt certificate on its own; it keeps it in
 # the caddy_data volume.
+#
+# A change to this file needs the container recreated, not reloaded: it is a
+# single-file bind mount and git writes a new inode. deploy/deploy.sh does that.
 
 bayt.andalsolutions.com {
 	encode zstd gzip
+
+	# Access log, JSON, in the caddy_data volume. Added after 2026-10-31, when a
+	# crawler drained the model balance and there was no record of who called what.
+	#   docker compose exec caddy tail -f /data/access.log
+	log {
+		output file /data/access.log {
+			roll_size 20mb
+			roll_keep 5
+		}
+	}
+
+	# AI training crawlers get a 403 everywhere except robots.txt (which also tells
+	# them to go away). On 2026-10-30 ClaudeBot rendered every "More like this" URL
+	# and each render made 1 paid model call: 233,001 calls in 43 hours. The paid
+	# call is also gated behind a session cookie now, so this is the second fence.
+	@ai_crawlers {
+		header_regexp User-Agent (?i)(ClaudeBot|Claude-SearchBot|Claude-User|anthropic-ai|GPTBot|ChatGPT-User|OAI-SearchBot|CCBot|Bytespider|Amazonbot|PerplexityBot|meta-externalagent|FacebookBot|Google-Extended|Applebot-Extended|cohere-ai|Diffbot|AI2Bot|ImagesiftBot|omgili|YouBot)
+		not path /robots.txt
+	}
 
 	# Route handlers in frontend/app/api/**/route.ts. The browser calls these and
 	# they proxy to the API themselves. Keep this list in step with that folder:
 	# a new handler under /api that is not listed here would hit FastAPI instead.
 	@next_api path /api/pins /api/pins/* /api/city/boundary /api/tiles/buildings/* /api/listings/*/zoning/ask /api/listings/*/zoning/pathways /api/session /api/session/events
 
-	# FastAPI: every route in backend/app/main.py is under /api, plus its docs.
-	@backend path /api/* /docs /docs/* /openapi.json /redoc
+	# FastAPI: every route in backend/app/main.py is under /api. Its /docs and
+	# /openapi.json are not published any more: they listed the paid routes.
+	@backend path /api/*
 
 	# Evaluated in order; the first match wins.
 	route {
+		respond @ai_crawlers "AI crawlers are not allowed on this site. See /robots.txt." 403
 		reverse_proxy @next_api frontend:3000
 		reverse_proxy @backend backend:8000
 		reverse_proxy frontend:3000

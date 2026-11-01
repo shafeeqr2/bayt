@@ -31,7 +31,7 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, Callable
 
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
@@ -48,6 +48,9 @@ from app.strategy.finance import Financing
 from app.zoning import answer as llm
 
 PROMPT_VERSION = 1
+# The spend hook (app.guard): asked before each uncached model call; a string is the reason to skip it.
+Spend = Callable[[], str | None]
+
 CANDIDATES = 30
 RESULTS = 8
 MIN_CANDIDATES = 5
@@ -272,7 +275,7 @@ def _store(session: Session, listing_id: str, key: str, model: str, result: dict
 
 def steer_vector(
     session: Session, client: llm.Backend, listing: Listing, source: ListingPersonaProfile, facts: dict[str, Any] | None, text: str,
-    embed_client: embedder.EmbeddingClient | None = None,
+    embed_client: embedder.EmbeddingClient | None = None, spend: Spend | None = None,
 ) -> tuple[tuple[str, list[str]], list[float]]:
     """The rewritten pitch, its signals and its vector for a typed change; cached for `CACHE_TTL`. Raises ModelUnavailable."""
     embed_client = embed_client or embedder.make_client()
@@ -284,6 +287,8 @@ def steer_vector(
     hit = _cached(session, listing.id, key)
     if hit is not None and hit.result.get("vector"):
         return (hit.result["pitch"], list(hit.result.get("signals") or [])), [float(x) for x in hit.result["vector"]]
+    if spend and (denied := spend()):
+        raise llm.ModelUnavailable(denied)
     pitch, signals = steering_mod.rewrite(client, listing, source, facts, text)
     vector = embed_client.embed([pitch + (f"\nSignals: {'; '.join(signals)}" if signals else "")])[0]
     _store(session, listing.id, key, client.model, {"pitch": pitch, "signals": signals, "vector": vector})
@@ -292,8 +297,9 @@ def steer_vector(
 
 def similar(
     session: Session, listing: Listing, persona: str, *, client: llm.Backend | None = None, use_model: bool = True, limit: int = RESULTS,
-    steering: Steering = DEFAULT, embed_client: embedder.EmbeddingClient | None = None,
+    steering: Steering = DEFAULT, embed_client: embedder.EmbeddingClient | None = None, spend: Spend | None = None,
 ) -> SimilarHomes:
+    """`spend` is asked right before each uncached model call (app.guard); when it returns a reason, the call is skipped and the reason noted."""
     if persona not in hp.PERSONAS:
         raise ValueError(f"unknown persona {persona}")
     source = session.get(ListingPersonaProfile, (listing.id, persona))
@@ -319,7 +325,7 @@ def similar(
             notes.append("not steered: no model configured" if use_model else "not steered: the model is off")
         else:
             try:
-                target, vector = steer_vector(session, client, listing, source, facts, steering.text, embed_client)
+                target, vector = steer_vector(session, client, listing, source, facts, steering.text, embed_client, spend=spend)
             except llm.ModelUnavailable as exc:
                 notes.append(f"not steered: {exc}; the ask went to the ranking only")
 
@@ -337,6 +343,8 @@ def similar(
             picks = [(p["id"], p["reason"]) for p in hit.result["picks"]]
             distinct = hit.result.get("distinct")
             reranked, cached = True, True
+        elif (denied := spend() if spend else None):
+            notes.append(f"not reranked: {denied}")
         else:
             try:
                 picks, distinct = rerank(client, listing, source, facts, rows, steering, target)

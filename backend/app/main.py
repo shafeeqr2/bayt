@@ -1,6 +1,6 @@
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Response
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import Select, func, select, text
@@ -12,6 +12,7 @@ from app.city.tiles import MAX_ZOOM, MIN_ZOOM, building_tile, buildings_loaded, 
 from app.city.zones import zone_label, zone_rules
 from app.config import settings
 from app.db import get_session
+from app import guard
 from app.lot import floorplan, rooms
 from app.lot import service as lot_service
 from app.lot.floorplan import FloorPlanResult
@@ -99,9 +100,9 @@ def _persona_scores(session: Session, ids: list[str]) -> dict[str, dict[str, int
 
 
 @app.get("/api/health")
-def health(session: SessionDep) -> dict[str, str]:
+def health(session: SessionDep) -> dict[str, Any]:
     session.execute(text("select 1"))
-    return {"status": "ok"}
+    return {"status": "ok", "model_calls": guard.budget.counts()}
 
 
 def listing_filters(
@@ -371,15 +372,17 @@ def get_listing_photos(listing_id: str, session: SessionDep) -> photo_reader.Lis
 
 
 @app.post("/api/listings/{listing_id}/photos/read")
-def post_listing_photos_read(listing_id: str, session: SessionDep, force: bool = False) -> photo_reader.ListingPhotos:
+def post_listing_photos_read(listing_id: str, session: SessionDep, request: Request, force: bool = False) -> photo_reader.ListingPhotos:
     """Read the listing's photos with the vision model and store the labels.
 
     One structured call per photo, in parallel. Photos already read with the current
-    prompt are skipped unless `force`. Without LLM_API_KEY this is a 503.
+    prompt are skipped unless `force`. Without LLM_API_KEY this is a 503. Counts
+    against the spend guards (429 when a cap is hit).
     """
     listing = session.get(Listing, listing_id)
     if listing is None:
         raise HTTPException(status_code=404, detail="Listing not found")
+    guard.charge(request)
     try:
         return photo_reader.read_listing_photos(session, listing, force=force)
     except zoning_answer.ModelUnavailable as exc:
@@ -387,11 +390,12 @@ def post_listing_photos_read(listing_id: str, session: SessionDep, force: bool =
 
 
 @app.post("/api/listings/{listing_id}/photos/review")
-def post_listing_photos_review(listing_id: str, session: SessionDep) -> photo_reader.ListingPhotos:
+def post_listing_photos_review(listing_id: str, session: SessionDep, request: Request) -> photo_reader.ListingPhotos:
     """The second pass alone: all stored labels in one text-model call; fixes the level, room and front-or-back calls."""
     listing = session.get(Listing, listing_id)
     if listing is None:
         raise HTTPException(status_code=404, detail="Listing not found")
+    guard.charge(request)
     try:
         photo_reader.review_labels(session, listing)
     except zoning_answer.ModelUnavailable as exc:
@@ -409,15 +413,17 @@ def get_listing_profile(listing_id: str, session: SessionDep) -> house_profile.L
 
 
 @app.post("/api/listings/{listing_id}/profile")
-def post_listing_profile(listing_id: str, session: SessionDep, force: bool = False) -> house_profile.ListingProfileOut:
+def post_listing_profile(listing_id: str, session: SessionDep, request: Request, force: bool = False) -> house_profile.ListingProfileOut:
     """Write the house profile with the model and embed the 4 pitches.
 
     One call for the facts and the 4 persona views, then one embedding call. A profile
     written with the current prompt is kept unless `force`. Without LLM_API_KEY this is a 503.
+    Counts against the spend guards (429 when a cap is hit).
     """
     listing = session.get(Listing, listing_id)
     if listing is None:
         raise HTTPException(status_code=404, detail="Listing not found")
+    guard.charge(request)
     try:
         return house_profile.write_profile(session, listing, force=force)
     except zoning_answer.ModelUnavailable as exc:
@@ -428,6 +434,7 @@ def post_listing_profile(listing_id: str, session: SessionDep, force: bool = Fal
 def get_listing_similar(
     listing_id: str,
     session: SessionDep,
+    request: Request,
     persona: house_profile.Persona = "first_time_buyer",
     limit: Annotated[int, Query(ge=1, le=similar_service.RESULTS)] = similar_service.RESULTS,
     rerank: bool = True,
@@ -443,6 +450,9 @@ def get_listing_similar(
     `steer` is the buyer's typed change: one model call rewrites the source pitch with it
     applied and the search runs from that text (cached too). `facets` drops facets from
     the comparison; location and money also drop their hard filter.
+
+    Each uncached model call is checked against the spend guards (app.guard); over a cap
+    the answer falls back to the nearest-neighbour order with a note, never a 429.
     """
     listing = session.get(Listing, listing_id)
     if listing is None:
@@ -451,7 +461,8 @@ def get_listing_similar(
         steering = steer_mod.parse(steer, facets)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return similar_service.similar(session, listing, persona, use_model=rerank, limit=limit, steering=steering)
+    ip = guard.client_ip(request)
+    return similar_service.similar(session, listing, persona, use_model=rerank, limit=limit, steering=steering, spend=lambda: guard.budget.take(ip))
 
 
 @app.get("/api/lot")
@@ -496,16 +507,18 @@ def post_point_pathways(
 
 
 @app.post("/api/listings/{listing_id}/zoning/ask")
-def post_listing_ask(listing_id: str, req: zoning_answer.AskRequest, session: SessionDep) -> zoning_answer.AskResponse:
+def post_listing_ask(listing_id: str, req: zoning_answer.AskRequest, session: SessionDep, request: Request) -> zoning_answer.AskResponse:
     """The plan in plain words (and/or detail fields) -> the deterministic analysis -> a cited written answer.
 
     The model reads the text into the intent fields and writes the answer from the analysis
     alone; every paragraph must cite a card, clause, gap or nearby file in it, or it is dropped.
-    Without LLM_API_KEY the response carries the analysis and `answer` is null.
+    Without LLM_API_KEY the response carries the analysis and `answer` is null. Counts
+    against the spend guards (429 when a cap is hit).
     """
     listing = session.get(Listing, listing_id)
     if listing is None:
         raise HTTPException(status_code=404, detail="Listing not found")
+    guard.charge(request)
     try:
         return zoning_service.ask_for_listing(session, listing, req)
     except (lot_service.NotInCoverage, lot_service.ListingNotLocated, lot_service.GISError) as exc:

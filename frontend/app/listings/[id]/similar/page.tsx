@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
 import { getListing, type PersonaKey } from "@/lib/api";
-import { defaultPersona, getSessionState } from "@/lib/session";
+import { defaultPersona, getSessionState, getSid } from "@/lib/session";
 import { PersonaNote } from "../../../persona-note";
 import { ArrowLeftIcon } from "../../../icons";
 import { Help } from "../../../ui";
@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: PageProps<"/listings/[id]/sim
 /** "More like this": the similar-homes search for one house, steered by the buyer. */
 export default async function SimilarPage({ params, searchParams }: PageProps<"/listings/[id]/similar">) {
   const [{ id }, query] = await Promise.all([params, searchParams]);
-  const [listing, state] = await Promise.all([getListing(id), getSessionState()]);
+  const [listing, state, sid] = await Promise.all([getListing(id), getSessionState(), getSid()]);
   if (!listing) notFound();
   const guessed = personaGiven(query) ? null : defaultPersona(state);
   const steer = parseSteer(query, guessed ?? "first_time_buyer");
@@ -50,9 +50,10 @@ export default async function SimilarPage({ params, searchParams }: PageProps<"/
         </div>
       </div>
 
-      {/* One cached model call on the backend, so it streams in. */}
+      {/* One cached model call on the backend, so it streams in. Only for a visitor with a session:
+          a crawler has none, and SessionBoot refreshes the page once the cookie is set. */}
       <Suspense fallback={<Skeleton />}>
-        <SimilarPanel listing={listing} steer={steer} />
+        <SimilarPanel listing={listing} steer={steer} rerank={sid !== null} />
       </Suspense>
     </div>
   );

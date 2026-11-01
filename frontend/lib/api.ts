@@ -75,8 +75,8 @@ export type ListingPage = {
 
 export type Facets = { cities: string[]; building_types: string[] };
 
-async function get<T>(path: string): Promise<T | null> {
-  const res = await fetch(`${BACKEND_URL}${path}`);
+async function get<T>(path: string, headers?: HeadersInit): Promise<T | null> {
+  const res = await fetch(`${BACKEND_URL}${path}`, headers ? { headers } : undefined);
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`API ${path} failed: ${res.status}`);
   return res.json();
@@ -496,10 +496,18 @@ export async function getHouseProfile(id: string): Promise<HouseProfile | null> 
   return get(`/api/listings/${encodeURIComponent(id)}/profile`);
 }
 
-/** Similar homes for one persona, steered by the typed change and the facets. Cached model calls on the backend. */
-export async function getSimilarHomes(id: string, steer: Steer): Promise<SimilarHomes | null> {
+/**
+ * Similar homes for one persona, steered by the typed change and the facets. Cached model calls on the backend.
+ *
+ * `rerank` false asks for the nearest-neighbour order and never spends a model call. The pages pass
+ * it as "the visitor has a session cookie": a crawler never has one, and on 2026-10-30 a crawler
+ * rendering every URL variant made 233,001 paid calls. `clientIp` goes to the backend as
+ * X-Forwarded-For so its per-client cap sees the visitor, not this server.
+ */
+export async function getSimilarHomes(id: string, steer: Steer, opts: { rerank: boolean; clientIp?: string | null }): Promise<SimilarHomes | null> {
   const params = new URLSearchParams({ persona: steer.persona });
   if (steer.text) params.set("steer", steer.text);
   if (steer.facets && steer.facets.length < FACETS.length) params.set("facets", steer.facets.join(","));
-  return get(`/api/listings/${encodeURIComponent(id)}/similar?${params}`);
+  if (!opts.rerank) params.set("rerank", "false");
+  return get(`/api/listings/${encodeURIComponent(id)}/similar?${params}`, opts.clientIp ? { "X-Forwarded-For": opts.clientIp } : undefined);
 }

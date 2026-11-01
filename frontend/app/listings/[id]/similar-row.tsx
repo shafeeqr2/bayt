@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -26,11 +27,15 @@ import { WHO, activeFacets, moreLikeThisHref, similarHref } from "./steer";
  *
  * Every control writes the page URL (`?persona=&steer=&facets=`), so this is a server component;
  * the backend caches the rewrite and the rerank.
+ *
+ * `rerank` is "the visitor has a session cookie". Without it the panel shows the nearest-neighbour
+ * order and spends nothing: a crawler never gets the cookie (see app/robots.ts for why).
  */
-export async function SimilarPanel({ listing, steer }: { listing: ListingDetail; steer: Steer }) {
+export async function SimilarPanel({ listing, steer, rerank }: { listing: ListingDetail; steer: Steer; rerank: boolean }) {
   const { persona } = steer;
   const id = listing.id;
-  const [profile, similar] = await Promise.all([getHouseProfile(id), getSimilarHomes(id, steer)]);
+  const clientIp = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() || null;
+  const [profile, similar] = await Promise.all([getHouseProfile(id), getSimilarHomes(id, steer, { rerank, clientIp })]);
   const scores = new Map((profile?.personas ?? []).map((p) => [p.persona, p.score]));
   const view = profile?.personas.find((p) => p.persona === persona) ?? null;
   const facets = activeFacets(steer);
