@@ -11,13 +11,13 @@ Docker Compose runs 4 containers from `docker-compose.yml` plus `docker-compose.
 |---|---|---|
 | `caddy` | `caddy:2` | The internet, ports 80 and 443. Gets and renews the Let's Encrypt certificate on its own. |
 | `frontend` | built from `frontend/Dockerfile` (Next.js standalone) | Caddy only, port 3000 |
-| `backend` | built from `backend/Dockerfile` (FastAPI) | Caddy and the frontend only, port 8000 |
+| `backend` | built from `backend/Dockerfile` (FastAPI) | The frontend only, port 8000 (Caddy proxies `/api/health` alone) |
 | `db` | built from `db/Dockerfile` (Postgres 17 + PostGIS + pgvector) | The backend only. Data in the `pgdata` volume. |
 
 `deploy/Caddyfile` routes requests.
 Known AI training crawlers (ClaudeBot, GPTBot, CCBot, Bytespider and others) get a 403 on every path except `/robots.txt`.
-The 5 Next.js route handlers under `frontend/app/api/` go to the frontend.
-The rest of `/api/*` goes to FastAPI. Its `/docs` and `/openapi.json` are not published.
+The 7 Next.js route handlers under `frontend/app/api/` go to the frontend.
+FastAPI is not published, except `/api/health`. The browser only ever calls the route handlers; the Next.js server reaches FastAPI over the Compose network. Any other `/api/*` path is a 404 from Next.js.
 Everything else goes to the frontend.
 If you add a route handler under `frontend/app/api/`, add its path to the `@next_api` matcher in the Caddyfile.
 Caddy writes a JSON access log to `/data/access.log` in the `caddy_data` volume: `docker compose exec caddy tail -f /data/access.log`.
@@ -25,12 +25,13 @@ A deploy recreates the Caddy container only when the Caddyfile changed (it is a 
 
 ## Spend guards
 
-On 2026-10-30 the site went public with no robots.txt and no cap on model calls. Anthropic's ClaudeBot rendered every "More like this" URL (2,261 listings x 4 personas x facet subsets), each render made 1 paid rerank call, and 233,001 calls in 43 hours drained the Token Factory balance. 4 fences now stand between a visitor and a paid call:
+On 2026-10-30 the site went public with no robots.txt and no cap on model calls. Anthropic's ClaudeBot rendered every "More like this" URL (2,261 listings x 4 personas x facet subsets), each render made 1 paid rerank call, and 233,001 calls in 43 hours drained the Token Factory balance. 5 fences now stand between a visitor and a paid call:
 
 1. `frontend/app/robots.ts`: the similar pages and `/api/` are off limits to every crawler; the AI training crawlers are off the whole site.
 2. The Caddyfile answers 403 to those crawlers by User-Agent.
 3. The similar page asks the backend for a rerank only when the visitor has the session cookie (`bayt_sid`). A crawler runs no JavaScript and never gets one. A human's first page refreshes once the cookie is set.
-4. `backend/app/guard.py`: `MODEL_DAILY_CAP` (default 2,000 calls per UTC day across the service) and `MODEL_IP_HOURLY_CAP` (default 60 per client address per hour). Over a cap the similar page falls back to the nearest-neighbour order with a note; the POST routes answer 429. `GET /api/health` shows today's count.
+4. FastAPI is not reachable from the internet (above), so the batch routes (`photos/read`, `photos/review`, `profile`) and the similar rerank can only be called by the Next.js server or from inside the server.
+5. `backend/app/guard.py`: `MODEL_DAILY_CAP` (default 2,000 calls per UTC day across the service) and `MODEL_IP_HOURLY_CAP` (default 60 per client address per hour). Over a cap the similar page falls back to the nearest-neighbour order with a note; the POST routes answer 429. `GET /api/health` shows today's count.
 
 Also set a spending limit on the Token Factory account itself; the backend cannot see the balance.
 

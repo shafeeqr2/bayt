@@ -32,15 +32,20 @@ bayt.andalsolutions.com {
 	# a new handler under /api that is not listed here would hit FastAPI instead.
 	@next_api path /api/pins /api/pins/* /api/city/boundary /api/tiles/buildings/* /api/listings/*/zoning/ask /api/listings/*/zoning/pathways /api/session /api/session/events
 
-	# FastAPI: every route in backend/app/main.py is under /api. Its /docs and
-	# /openapi.json are not published any more: they listed the paid routes.
-	@backend path /api/*
+	# FastAPI is not published. The browser only ever calls the route handlers
+	# above; the Next.js server reaches FastAPI over the Compose network. Before
+	# 2026-11-01 every /api/* path was proxied to FastAPI, which exposed the
+	# batch routes (photos/read is 1 vision call per photo, 50 photos on some
+	# listings) and the similar rerank to anyone with curl. Only the health check
+	# stays public; it shows the day's model-call count.
+	@backend path /api/health
 
 	# Evaluated in order; the first match wins.
 	route {
 		respond @ai_crawlers "AI crawlers are not allowed on this site. See /robots.txt." 403
 		reverse_proxy @next_api frontend:3000
 		reverse_proxy @backend backend:8000
+		# Any other /api/* path is a 404 from Next.js, not FastAPI.
 		reverse_proxy frontend:3000
 	}
 }
