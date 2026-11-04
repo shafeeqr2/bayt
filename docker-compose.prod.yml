@@ -29,6 +29,11 @@ services:
     environment:
       # Read on the Next.js server at request time (frontend/lib/backend.ts).
       BACKEND_URL: http://backend:8000
+      # Cloudflare Turnstile in front of the session cookie, and the key that signs the
+      # cookie (frontend/lib/turnstile.ts, frontend/lib/sid.ts). See docs/deploy.md.
+      TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-}
+      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-}
+      SESSION_SECRET: ${SESSION_SECRET:-}
     depends_on:
       backend:
         condition: service_healthy

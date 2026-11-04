@@ -25,13 +25,15 @@ A deploy recreates the Caddy container only when the Caddyfile changed (it is a 
 
 ## Spend guards
 
-On 2026-10-30 the site went public with no robots.txt and no cap on model calls. Anthropic's ClaudeBot rendered every "More like this" URL (2,261 listings x 4 personas x facet subsets), each render made 1 paid rerank call, and 233,001 calls in 43 hours drained the Token Factory balance. 5 fences now stand between a visitor and a paid call:
+On 2026-10-30 the site went public with no robots.txt and no cap on model calls. Anthropic's ClaudeBot rendered every "More like this" URL (2,261 listings x 4 personas x facet subsets), each render made 1 paid rerank call, and 233,001 calls in 43 hours drained the Token Factory balance. 6 fences now stand between a visitor and a paid call:
 
 1. `frontend/app/robots.ts`: the similar pages and `/api/` are off limits to every crawler; the AI training crawlers are off the whole site.
 2. The Caddyfile answers 403 to those crawlers by User-Agent.
-3. The similar page asks the backend for a rerank only when the visitor has the session cookie (`bayt_sid`). A crawler runs no JavaScript and never gets one. A human's first page refreshes once the cookie is set.
-4. FastAPI is not reachable from the internet (above), so the batch routes (`photos/read`, `photos/review`, `profile`) and the similar rerank can only be called by the Next.js server or from inside the server.
-5. `backend/app/guard.py`: `MODEL_DAILY_CAP` (default 500 calls per UTC day across the service) and `MODEL_IP_HOURLY_CAP` (default 60 per client address per hour). Over a cap the similar page falls back to the nearest-neighbour order with a note; the POST routes answer 429. `GET /api/health` shows today's count.
+3. The similar page asks the backend for a rerank, and the zoning "ask" route answers at all, only when the visitor has a valid session cookie (`bayt_sid`). A crawler runs no JavaScript and never gets one. A human's first page refreshes once the cookie is set.
+   The cookie is `<id>.<hmac>`, signed with `SESSION_SECRET` (`frontend/lib/sid.ts`), so `curl -b bayt_sid=x` is the same as no cookie.
+4. Cloudflare Turnstile (free) in front of the cookie: `POST /api/session` sets the cookie only for a token Cloudflare accepts (`frontend/lib/turnstile.ts`, widget in `frontend/app/session-boot.tsx`). The widget is invisible unless Cloudflare wants a click; then a small box appears at the bottom right. A headless browser has to pass as a human before the site spends anything on it. The widget "Bayt" lives in the Cloudflare account (domains `bayt.andalsolutions.com` and `localhost`, managed mode); its site key and secret are `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` in `/opt/bayt/.env`. Both empty = no check (development).
+5. FastAPI is not reachable from the internet (above), so the batch routes (`photos/read`, `photos/review`, `profile`) and the similar rerank can only be called by the Next.js server or from inside the server.
+6. `backend/app/guard.py`: `MODEL_DAILY_CAP` (default 500 calls per UTC day across the service) and `MODEL_IP_HOURLY_CAP` (default 60 per client address per hour). Over a cap the similar page falls back to the nearest-neighbour order with a note; the POST routes answer 429. `GET /api/health` shows today's count.
 
 `.github/workflows/model-spend-alert.yml` reads `/api/health` every hour and fails when the day's count passes 200, which makes GitHub email the repository owner. Also set a spending limit on the Token Factory account itself; the backend cannot see the balance.
 

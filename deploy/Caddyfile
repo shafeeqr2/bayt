@@ -21,7 +21,8 @@ bayt.andalsolutions.com {
 	# AI training crawlers get a 403 everywhere except robots.txt (which also tells
 	# them to go away). On 2026-10-30 ClaudeBot rendered every "More like this" URL
 	# and each render made 1 paid model call: 233,001 calls in 43 hours. The paid
-	# call is also gated behind a session cookie now, so this is the second fence.
+	# call is also gated behind a signed session cookie that only a visitor who passed
+	# Cloudflare Turnstile gets, so this is the second fence.
 	@ai_crawlers {
 		header_regexp User-Agent (?i)(ClaudeBot|Claude-SearchBot|Claude-User|anthropic-ai|GPTBot|ChatGPT-User|OAI-SearchBot|CCBot|Bytespider|Amazonbot|PerplexityBot|meta-externalagent|FacebookBot|Google-Extended|Applebot-Extended|cohere-ai|Diffbot|AI2Bot|ImagesiftBot|omgili|YouBot)
 		not path /robots.txt

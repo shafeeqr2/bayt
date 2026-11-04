@@ -4,11 +4,13 @@ import { cookies } from "next/headers";
 
 import { BACKEND_URL } from "./backend";
 import { PERSONAS, type ListingSummary, type PersonaKey } from "./api";
+import { parseSid } from "./sid";
 
 /*
   Session taste (similar homes, phase 4). The visitor's session is a random id in an
-  httpOnly cookie; the backend keeps the opens, saves and dismissals and, every 5
-  actions, a taste summary with a persona guess. No login.
+  httpOnly cookie, signed by the server and issued only after the Turnstile check
+  (lib/sid.ts, lib/turnstile.ts); the backend keeps the opens, saves and dismissals
+  and, every 5 actions, a taste summary with a persona guess. No login.
 */
 
 export const SID_COOKIE = "bayt_sid";
@@ -25,11 +27,13 @@ export type Taste = {
 
 export type SessionState = { actions: number; saves: ListingSummary[]; taste: Taste | null };
 
-/** The session id from the cookie, or null on a first visit (the client sets it after the first render). */
+/**
+ * The session id from the cookie, or null on a first visit (the client sets it after the first
+ * render) and for a cookie with a bad signature (a forged one, or one from before signing).
+ */
 export async function getSid(): Promise<string | null> {
   const jar = await cookies();
-  const value = jar.get(SID_COOKIE)?.value;
-  return value && /^[A-Za-z0-9_-]{8,64}$/.test(value) ? value : null;
+  return parseSid(jar.get(SID_COOKIE)?.value);
 }
 
 /** The saves and the taste for this visitor, or null without a session yet. Never calls the model. */

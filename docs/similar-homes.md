@@ -151,8 +151,9 @@ judgments, 70% agreement with the top 5) are not done yet.
 
 ## Session taste (phase 4)
 
-No login. The first page view sets an httpOnly cookie `bayt_sid` (32 hex, 1 year,
-SameSite lax) from a Next route; the browser never sees the backend. Every open,
+No login. The first page view passes Cloudflare Turnstile, then sets an httpOnly cookie
+`bayt_sid` (32 hex id plus an HMAC signature, 1 year, SameSite lax) from a Next route;
+the browser never sees the backend, and a forged cookie fails the signature check. Every open,
 save, unsave and dismiss posts one event through `/api/session/events` to
 `POST /api/session/{sid}/events`, stored in `session_events` with how the visitor
 reached the house (`via`: similar, search, direct, saved) and the buyer in view.

@@ -224,7 +224,7 @@ Netflix's public engineering writing describes a move from models driven by inte
 
 `backend/app/taste/service.py`, with Next route handlers under `frontend/app/api/session/`.
 
-- **Session.** The first visit sets an httpOnly cookie `bayt_sid` (32 hex characters, 1 year, SameSite lax) from a Next route handler. The browser never sees the backend.
+- **Session.** The first visit passes Cloudflare Turnstile, then a Next route handler sets an httpOnly cookie `bayt_sid` (a 32 hex character id plus an HMAC signature, 1 year, SameSite lax). The browser never sees the backend, and a forged cookie fails the signature check.
 - **Events.** Every open, save, unsave and dismiss posts 1 event to `POST /api/session/{sid}/events` with `via` (similar, search, direct, saved) and the buyer in view. A session holds at most 2,000 events.
 - **The summary.** After every 5th event the backend makes 1 structured call to `nvidia/nemotron-3-super-120b-a12b` with the last 20 events, each with the house's facts, its 4 scores and the best persona's pitch. The answer is 1 or 2 sentences addressed to "you", a persona guess, a confidence from 0 to 1 and 3 to 5 "likes". It is stored in `session_taste`; failures go to `note` and never reach the visitor.
 - **Default buyer.** `GET /api/session/{sid}` returns the saves, the taste and `default_persona`: the guess when the confidence is 0.7 or more. The search, listing and Taste Match pages use it when the URL names no buyer and say so in 1 line. A buyer in the URL always wins.

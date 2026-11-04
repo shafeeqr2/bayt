@@ -117,6 +117,10 @@ export function PathwaysPanel({ id }: { id: string }) {
       if (res.status === 404) {
         setError("No parcel data for this listing; the analysis covers Toronto lots only.");
         setResult(null);
+      } else if (res.status === 401) {
+        setError("Your session has not started yet. Reload the page and try again.");
+      } else if (res.status === 429) {
+        setError("The model is busy today. Try again later.");
       } else if (!res.ok) {
         setError(`The analysis failed (${res.status}). Try again in a moment.`);
       } else {

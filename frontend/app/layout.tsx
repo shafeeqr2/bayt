@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 
 import { getSid } from "@/lib/session";
+import { TURNSTILE_SITE_KEY } from "@/lib/turnstile";
 import "./globals.css";
 import { HomeIcon } from "./icons";
 import { SessionBoot } from "./session-boot";
@@ -38,9 +39,12 @@ const NAV = [
   { href: "/pitch", label: "Why Bayt" },
 ];
 
-/** Reads the cookie inside a Suspense boundary (it is runtime data) and mounts the boot only on a first visit. */
+/**
+ * Reads the cookie inside a Suspense boundary (it is runtime data) and mounts the boot only
+ * when there is no valid session: a first visit, or a cookie that fails the signature check.
+ */
 async function SessionGate() {
-  return (await getSid()) ? null : <SessionBoot />;
+  return (await getSid()) ? null : <SessionBoot siteKey={TURNSTILE_SITE_KEY} />;
 }
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
