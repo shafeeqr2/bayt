@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     # Spend guards (app/guard.py). A crawler drained the model balance on 2026-10-31 by
     # rendering every similar-homes URL; these bound how much the API may spend on its own.
     # Model calls per UTC day across the service, and per client address per hour. -1 = off.
-    model_daily_cap: int = 2000
+    model_daily_cap: int = 500
     model_ip_hourly_cap: int = 60
 
 

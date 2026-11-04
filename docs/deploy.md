@@ -31,9 +31,9 @@ On 2026-10-30 the site went public with no robots.txt and no cap on model calls.
 2. The Caddyfile answers 403 to those crawlers by User-Agent.
 3. The similar page asks the backend for a rerank only when the visitor has the session cookie (`bayt_sid`). A crawler runs no JavaScript and never gets one. A human's first page refreshes once the cookie is set.
 4. FastAPI is not reachable from the internet (above), so the batch routes (`photos/read`, `photos/review`, `profile`) and the similar rerank can only be called by the Next.js server or from inside the server.
-5. `backend/app/guard.py`: `MODEL_DAILY_CAP` (default 2,000 calls per UTC day across the service) and `MODEL_IP_HOURLY_CAP` (default 60 per client address per hour). Over a cap the similar page falls back to the nearest-neighbour order with a note; the POST routes answer 429. `GET /api/health` shows today's count.
+5. `backend/app/guard.py`: `MODEL_DAILY_CAP` (default 500 calls per UTC day across the service) and `MODEL_IP_HOURLY_CAP` (default 60 per client address per hour). Over a cap the similar page falls back to the nearest-neighbour order with a note; the POST routes answer 429. `GET /api/health` shows today's count.
 
-Also set a spending limit on the Token Factory account itself; the backend cannot see the balance.
+`.github/workflows/model-spend-alert.yml` reads `/api/health` every hour and fails when the day's count passes 200, which makes GitHub email the repository owner. Also set a spending limit on the Token Factory account itself; the backend cannot see the balance.
 
 Differences from `./start.sh` on your machine:
 

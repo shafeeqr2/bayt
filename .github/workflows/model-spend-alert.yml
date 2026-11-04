@@ -1,0 +1,36 @@
+# Hourly watch on the model spend. GET /api/health returns the day's model-call
+# count (backend/app/guard.py). When it passes the threshold this job fails, and
+# GitHub emails the repository owner about the failed run. That is the alert: no
+# mail server and no extra credentials on the droplet.
+#
+# Why: on 2026-10-31 a crawler made 233,001 model calls in 43 hours and nobody
+# knew until the balance was gone. The backend now caps calls at 500 a day; this
+# job tells us when a day is unusually busy, long before the cap.
+#
+# Run it by hand: gh workflow run model-spend-alert.yml
+name: Model spend alert
+
+on:
+  schedule:
+    - cron: "7 * * * *"
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    env:
+      HEALTH_URL: https://bayt.andalsolutions.com/api/health
+      THRESHOLD: 200
+    steps:
+      - name: Read the day's model-call count
+        run: |
+          set -euo pipefail
+          body="$(curl -fsS --max-time 20 "$HEALTH_URL")"
+          echo "health: $body"
+          today="$(echo "$body" | python3 -c 'import json,sys; print(json.load(sys.stdin)["model_calls"]["today"])')"
+          echo "model calls today (UTC): $today, threshold: $THRESHOLD"
+          if [ "$today" -ge "$THRESHOLD" ]; then
+            echo "::error::Model calls today ($today) passed the threshold ($THRESHOLD). Check the Caddy access log: docker compose exec caddy tail /data/access.log"
+            exit 1
+          fi
