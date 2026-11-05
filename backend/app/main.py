@@ -621,13 +621,25 @@ def _sid(sid: str) -> str:
 
 
 @app.post("/api/session/{sid}/events")
-def post_session_event(sid: str, body: SessionEventIn, session: SessionDep) -> SessionEventOut:
-    """Record an open, save, unsave or dismiss. Every 5th action rewrites the taste summary (1 model call)."""
+def post_session_event(sid: str, body: SessionEventIn, session: SessionDep, request: Request) -> SessionEventOut:
+    """Record an open, save, unsave or dismiss. Every 5th action rewrites the taste summary (1 model call).
+
+    The summary call counts against the spend guards like every other model call (the 2026-11-04
+    audit found it did not: one session could make 400 uncounted calls, invisible to /api/health
+    and the spend alert). Over a cap the event is still stored and the last summary is returned;
+    no 429, because the event itself is free. Past MAX_EVENTS `record` drops the event and returns
+    the unchanged count, which is a multiple of EVERY, so without the `actions < MAX_EVENTS` check
+    every further post would be a model call.
+    """
     sid = _sid(sid)
     if session.get(Listing, body.listing_id) is None:
         raise HTTPException(status_code=404, detail="Listing not found")
     actions = taste.record(session, sid, body.listing_id, body.kind, body.via, body.persona)
-    row = taste.summarize(session, sid, actions, taste.make_client()) if taste.due(actions) else taste.taste_for(session, sid)
+    row = None
+    if taste.due(actions) and actions < taste.MAX_EVENTS and guard.budget.take(guard.client_ip(request)) is None:
+        row = taste.summarize(session, sid, actions, taste.make_client())
+    if row is None:
+        row = taste.taste_for(session, sid)
     return SessionEventOut(actions=actions, taste=_taste_out(row))
 
 
