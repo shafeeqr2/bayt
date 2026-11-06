@@ -89,7 +89,7 @@ def test_out_of_credit_goes_to_the_fallback_and_pauses_the_primary():
     assert seen["secondary"][0]["model"] == "nvidia/nemotron-3.5-super-vl" and seen["secondary"][0]["reasoning"] == {"enabled": False}
     stats = llm.provider_stats()
     assert stats == {"primary": "nebius", "fallback": "openrouter", "fallback_calls": 2, "primary_paused": True, "last_fallback_reason": stats["last_fallback_reason"]}
-    assert "HTTP 402" in stats["last_fallback_reason"]
+    assert stats["last_fallback_reason"] == "HTTP 402"  # the provider's own error text never reaches /api/health
 
 
 def test_a_transient_failure_falls_back_once_without_a_pause():

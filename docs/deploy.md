@@ -54,7 +54,7 @@ Every model call goes to Nebius Token Factory first (`LLM_API_KEY`). On 2026-11-
 - It is used only after a provider-level failure: HTTP 402 (no credit), 401/403 (key rejected), 429, 404, 408, 5xx, or a dropped connection. A bad model answer (wrong JSON, out of tokens) does not go to the fallback.
 - After a 402 or a rejected key the backend skips Token Factory for 10 minutes, then tries it again.
 - The model name in the caches and next to the stored vectors stays the Token Factory name, and the fallback asks for the same model in OpenRouter's lower-case naming (`nvidia/nemotron-3.5-super-vl`, `nvidia/nemotron-3-super-120b-a12b`, `qwen/qwen3-embedding-8b`), so caches stay warm and nothing is re-embedded.
-- `GET /api/health` shows it: `model_provider: {primary, fallback, fallback_calls, primary_paused, last_fallback_reason}`. `fallback_calls` counts since the last backend start.
+- `GET /api/health` shows it: `model_provider: {primary, fallback, fallback_calls, primary_paused, last_fallback_reason}`. `fallback_calls` counts since the last backend start. `last_fallback_reason` is the status code or a fixed phrase, never the provider's error text.
 - Fallback calls count against the same spend guards.
 
 Without `LLM_FALLBACK_API_KEY` nothing changes: a Token Factory failure degrades to the deterministic answers, as before.

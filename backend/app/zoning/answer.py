@@ -209,6 +209,14 @@ def fallback_model(model: str, provider: str) -> str:
     return model.lower() if provider == "openrouter" else model
 
 
+def public_reason(exc: Exception) -> str:
+    """What /api/health may show about a provider failure: the status code or the fixed phrase,
+    never the provider's own error text (it can carry account and billing wording)."""
+    text = str(exc)
+    status = re.search(r"HTTP (\d{3})", text)
+    return f"HTTP {status.group(1)}" if status else text[:60]
+
+
 def primary_paused(now: float | None = None) -> bool:
     with _state_lock:
         return (now if now is not None else time.monotonic()) < _paused_until
@@ -219,7 +227,7 @@ def note_fallback(exc: ProviderDown, what: str) -> None:
     global _paused_until, _fallback_calls, _last_reason
     with _state_lock:
         _fallback_calls += 1
-        _last_reason = str(exc)[:160]
+        _last_reason = public_reason(exc)
         if exc.sticky:
             _paused_until = time.monotonic() + PAUSE_S
     log.warning("model provider failed (%s); %s goes to the fallback provider", exc, what)
