@@ -15,6 +15,11 @@ class Settings(BaseSettings):
     # OpenAI-style chat endpoint works with llm_provider=openai + llm_base_url.
     llm_provider: str = "auto"
     llm_base_url: str | None = None
+    # Optional second provider for the same open models (an OpenRouter key, sk-or-). It answers
+    # only when the first provider refuses or fails: no credit (402), a rejected key, a rate
+    # limit, a 5xx or a dropped connection. See app.zoning.answer.FallbackBackend.
+    llm_fallback_api_key: str | None = None
+    llm_fallback_provider: str = "auto"
     # Model id in the provider's naming. Empty = the provider's default in
     # app.zoning.answer.PROVIDERS (claude-opus-5-5 on Anthropic, a Nemotron on OpenRouter).
     zoning_model: str = ""

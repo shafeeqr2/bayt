@@ -335,10 +335,11 @@ export default function PitchPage() {
       {/* Models */}
       <section className="space-y-8">
         <div className="max-w-2xl space-y-3">
-          <p className="text-xs font-medium uppercase tracking-wider text-accent">The models · all via Nebius Token Factory</p>
+          <p className="text-xs font-medium uppercase tracking-wider text-accent">The models · via Nebius Token Factory</p>
           <h2 className="display text-3xl font-semibold sm:text-4xl">Three models, one OpenAI-style API</h2>
           <p className="text-lg text-muted">
-            Every call runs on Nebius Token Factory. Postgres holds it all: pgvector for the pitches, PostGIS for the lots and the
+            Every call goes to Nebius Token Factory first. The models are open weights, so when Token Factory is unavailable the
+            same model answers through OpenRouter. Postgres holds it all: pgvector for the pitches, PostGIS for the lots and the
             Committee files.
           </p>
         </div>

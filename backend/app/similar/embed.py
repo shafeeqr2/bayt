@@ -51,16 +51,20 @@ class EmbeddingClient:
         body: dict[str, Any] = {"model": self.model, "input": texts}
         if self.provider == "nvidia":
             body["input_type"] = "passage"  # NIM's retrieval models need to know which side of the search this is
-        if self.provider == "nebius":
+        if self.provider == "nebius" or (self.provider == "openrouter" and _matryoshka(self.model)):
             body["dimensions"] = EMBEDDING_DIM
         try:
             response = self._http.post(self._url, json=body)
         except httpx.HTTPError as exc:
-            raise llm.ModelUnavailable(f"the embedding call failed: {exc.__class__.__name__}") from exc
+            raise llm.ProviderDown(f"the embedding call failed: {exc.__class__.__name__}") from exc
         if response.status_code in (401, 403):
-            raise llm.ModelUnavailable("the API key was rejected")
+            raise llm.ProviderDown("the API key was rejected", sticky=True)
         if response.status_code == 429:
-            raise llm.ModelUnavailable("the embedding model is rate limited; try again in a minute")
+            raise llm.ProviderDown("the embedding model is rate limited; try again in a minute")
+        if response.status_code == 402:  # no credit left on the account
+            raise llm.ProviderDown(f"the embedding call failed: HTTP 402 {response.text[:120]}", sticky=True)
+        if response.status_code in (404, 408) or response.status_code >= 500:
+            raise llm.ProviderDown(f"the embedding call failed: HTTP {response.status_code} {response.text[:120]}")
         if response.status_code >= 400:
             raise llm.ModelUnavailable(f"the embedding call failed: HTTP {response.status_code} {response.text[:120]}")
         try:
@@ -70,10 +74,49 @@ class EmbeddingClient:
             raise llm.ModelUnavailable("the embedding model returned no vectors") from exc
         if len(vectors) != len(texts):
             raise llm.ModelUnavailable(f"the embedding model returned {len(vectors)} vectors for {len(texts)} texts")
+        if _matryoshka(self.model):
+            # A host that ignores `dimensions` returns the full vector. For a Matryoshka model the
+            # first EMBEDDING_DIM floats, renormalised, are the vector `dimensions` would have given.
+            vectors = [_shorten(v) if len(v) > EMBEDDING_DIM else v for v in vectors]
         for v in vectors:
             if len(v) != EMBEDDING_DIM:
                 raise llm.ModelUnavailable(f"{self.model} returns {len(v)}-dimensional vectors; the table holds {EMBEDDING_DIM}")
         return vectors
+
+
+def _matryoshka(model: str) -> bool:
+    """Qwen3-Embedding is trained so that a prefix of the vector is itself a usable embedding."""
+    return "qwen3-embedding" in model.lower()
+
+
+def _shorten(vector: list[float]) -> list[float]:
+    head = vector[:EMBEDDING_DIM]
+    norm = sum(x * x for x in head) ** 0.5
+    return [x / norm for x in head] if norm else head
+
+
+class FallbackEmbeddingClient:
+    """Tries the first provider; on `ProviderDown` asks the second one for the same embedding model.
+
+    `model` stays the first provider's name, which labels the stored vectors: the fallback serves
+    the same weights, so the vectors live in the same space and nothing is re-embedded.
+    """
+
+    def __init__(self, primary: EmbeddingClient, secondary: EmbeddingClient) -> None:
+        self.primary = primary
+        self.secondary = secondary
+        self.model = primary.model
+        self.provider = primary.provider
+
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        if llm.primary_paused():
+            llm.count_fallback()
+            return self.secondary.embed(texts)
+        try:
+            return self.primary.embed(texts)
+        except llm.ProviderDown as exc:
+            llm.note_fallback(exc, "this embedding")
+            return self.secondary.embed(texts)
 
 
 def model_name() -> str:
@@ -83,12 +126,17 @@ def model_name() -> str:
     return DEFAULT_MODELS.get(p.name, "") if p else ""
 
 
-def make_client() -> EmbeddingClient | None:
+def make_client() -> EmbeddingClient | FallbackEmbeddingClient | None:
     p = llm.resolve_provider()
     model = model_name()
     if p is None or not p.base_url or not model:
         return None
-    return EmbeddingClient(settings.llm_api_key or "", p.base_url, model, p.name)
+    primary = EmbeddingClient(settings.llm_api_key or "", p.base_url, model, p.name)
+    f = llm.resolve_fallback(p)
+    if f is None or not f.base_url:
+        return primary
+    secondary = EmbeddingClient(settings.llm_fallback_api_key or "", f.base_url, llm.fallback_model(model, f.name), f.name)
+    return FallbackEmbeddingClient(primary, secondary)
 
 
 def text_for(row: ListingPersonaProfile) -> str:

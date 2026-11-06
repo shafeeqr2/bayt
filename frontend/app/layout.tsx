@@ -111,7 +111,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               <ul className="space-y-1.5 text-muted">
                 <li>Listings from the REALTOR.ca public feed.</li>
                 <li>Lot, zoning and permits: City of Toronto open data.</li>
-                <li>AI: NVIDIA Nemotron on Nebius Token Factory.</li>
+                <li>AI: NVIDIA Nemotron on Nebius Token Factory, with OpenRouter as the fallback.</li>
               </ul>
             </div>
           </div>

@@ -108,6 +108,9 @@ COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml
 # Model API key (Nebius Token Factory keys start with v1.). Empty turns the
 # model features off; the deterministic parts still work. See README.md.
 LLM_API_KEY=
+# Optional OpenRouter key (sk-or-): the same models answer through it when
+# Token Factory refuses or fails. Token Factory is always tried first.
+LLM_FALLBACK_API_KEY=
 ZONING_MODEL=
 PHOTO_MODEL=
 PROFILE_MODEL=

@@ -30,6 +30,10 @@ services:
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_PROVIDER: ${LLM_PROVIDER:-auto}
       LLM_BASE_URL: ${LLM_BASE_URL:-}
+      # Optional second provider (an OpenRouter key) for the same models; answers only when
+      # the first one refuses or fails. See backend/app/zoning/answer.py, FallbackBackend.
+      LLM_FALLBACK_API_KEY: ${LLM_FALLBACK_API_KEY:-}
+      LLM_FALLBACK_PROVIDER: ${LLM_FALLBACK_PROVIDER:-auto}
       ZONING_MODEL: ${ZONING_MODEL:-}
       PHOTO_MODEL: ${PHOTO_MODEL:-}
       PROFILE_MODEL: ${PROFILE_MODEL:-}

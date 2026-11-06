@@ -11,7 +11,7 @@ Live, no login: **https://bayt.andalsolutions.com**
 2. Open a house. "Who this home suits" scores it for a first-time buyer, an investor, a flipper and a builder. Click **More like this**: a page with 8 houses ranked for that buyer, 1 reason each. Every tile also has a sparkle button that opens this page for that house.
 3. On that page, in "Like this, but…" type `bigger backyard and a garage`. The matches and the reasons change. The chips under it choose what counts.
 
-Every model call runs on [Nebius Token Factory](https://tokenfactory.nebius.com) with NVIDIA Nemotron; see "AI models" below. Design notes for the feature: [docs/similar-homes.md](docs/similar-homes.md).
+Every model call goes to [Nebius Token Factory](https://tokenfactory.nebius.com) with NVIDIA Nemotron (with an optional OpenRouter fallback for the same models when Token Factory is unavailable); see "AI models" below. Design notes for the feature: [docs/similar-homes.md](docs/similar-homes.md).
 
 ## Quick start
 
@@ -49,7 +49,7 @@ The frontend talks to the API from the server side only, using `BACKEND_URL` (se
 
 ## AI models: NVIDIA Nemotron on Nebius Token Factory
 
-Every model call in Bayt goes through [Nebius Token Factory](https://tokenfactory.nebius.com) and uses NVIDIA's open Nemotron models. Put a Token Factory key in `.env` as `LLM_API_KEY` (they start with `v1.`); nothing else is needed. The models are open weights, so the same code also runs against NVIDIA NIM or OpenRouter, and `LLM_BASE_URL` points it at any OpenAI-style endpoint.
+Every model call in Bayt goes through [Nebius Token Factory](https://tokenfactory.nebius.com) and uses NVIDIA's open Nemotron models. Put a Token Factory key in `.env` as `LLM_API_KEY` (they start with `v1.`); nothing else is needed. The models are open weights, so the same code also runs against NVIDIA NIM or OpenRouter, and `LLM_BASE_URL` points it at any OpenAI-style endpoint. Because of that, an optional `LLM_FALLBACK_API_KEY` (an OpenRouter key) lets the same models answer when Token Factory refuses or fails, for example when the account is out of credit: Token Factory is always tried first, and `GET /api/health` reports how often the fallback answered (see [docs/deploy.md](docs/deploy.md), "Fallback model provider").
 
 | What | Model on Token Factory | Calls |
 |---|---|---|

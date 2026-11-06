@@ -102,7 +102,7 @@ def _persona_scores(session: Session, ids: list[str]) -> dict[str, dict[str, int
 @app.get("/api/health")
 def health(session: SessionDep) -> dict[str, Any]:
     session.execute(text("select 1"))
-    return {"status": "ok", "model_calls": guard.budget.counts()}
+    return {"status": "ok", "model_calls": guard.budget.counts(), "model_provider": zoning_answer.provider_stats()}
 
 
 def listing_filters(

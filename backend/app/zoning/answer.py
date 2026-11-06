@@ -22,7 +22,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import re
+import threading
+import time
 from dataclasses import dataclass
 from typing import Any, Protocol
 
@@ -52,6 +55,19 @@ NUMERIC_FIELDS = (
 
 class ModelUnavailable(RuntimeError):
     """No credentials, a refusal, or an API failure; the caller falls back to the deterministic answer."""
+
+
+class ProviderDown(ModelUnavailable):
+    """The provider itself refused or failed (no credit, a bad key, a rate limit, a 5xx, a dropped
+    connection), as opposed to the model giving an unusable answer. Only this kind is worth sending
+    to the fallback provider. `sticky` marks an account-level refusal that will repeat on the next call."""
+
+    def __init__(self, message: str, *, sticky: bool = False) -> None:
+        super().__init__(message)
+        self.sticky = sticky
+
+
+log = logging.getLogger("bayt.llm")
 
 
 # -- output schemas (plain types only: structured output rejects numeric bounds) ----
@@ -156,6 +172,105 @@ def model_name(provider: Provider | None = None) -> str:
     return settings.zoning_model or (p.default_model if p else "")
 
 
+# -- the fallback provider ---------------------------------------------------
+#
+# Bayt runs on Nebius Token Factory. On 2026-11-01 the Token Factory account ran out of credit
+# and every model feature went dark at once. The models are open weights and OpenRouter serves
+# the same ones, so a second key can answer when the first provider cannot. The first provider
+# is always tried first; the fallback is never the default. /api/health reports how often it
+# was used, and the site footer and the docs say that it exists.
+
+PAUSE_S = 600.0  # after an account-level refusal, skip the first provider for 10 minutes
+_state_lock = threading.Lock()
+_paused_until = 0.0
+_fallback_calls = 0
+_last_reason: str | None = None
+
+
+def resolve_fallback(primary: Provider | None = None) -> Provider | None:
+    """The second provider, from LLM_FALLBACK_API_KEY. None without a key, for a non OpenAI-style
+    provider, or when it is the same provider as the first one."""
+    key = settings.llm_fallback_api_key
+    if not key:
+        return None
+    name = (settings.llm_fallback_provider or "auto").lower()
+    if name == "auto":
+        name = next((p for prefix, p in KEY_PREFIXES if key.startswith(prefix)), "")
+    p = PROVIDERS.get(name)
+    if p is None or p.kind != "openai" or not p.base_url:
+        return None
+    if primary is not None and primary.name == p.name:
+        return None
+    return p
+
+
+def fallback_model(model: str, provider: str) -> str:
+    """The same model under the fallback provider's naming: OpenRouter ids are the Token Factory ids in lower case."""
+    return model.lower() if provider == "openrouter" else model
+
+
+def primary_paused(now: float | None = None) -> bool:
+    with _state_lock:
+        return (now if now is not None else time.monotonic()) < _paused_until
+
+
+def note_fallback(exc: ProviderDown, what: str) -> None:
+    """Count one fallback call; pause the first provider when the refusal is account-level."""
+    global _paused_until, _fallback_calls, _last_reason
+    with _state_lock:
+        _fallback_calls += 1
+        _last_reason = str(exc)[:160]
+        if exc.sticky:
+            _paused_until = time.monotonic() + PAUSE_S
+    log.warning("model provider failed (%s); %s goes to the fallback provider", exc, what)
+
+
+def count_fallback() -> None:
+    global _fallback_calls
+    with _state_lock:
+        _fallback_calls += 1
+
+
+def provider_stats() -> dict[str, Any]:
+    """For /api/health: which providers are configured and how often the fallback answered since start."""
+    p = resolve_provider()
+    f = resolve_fallback(p)
+    with _state_lock:
+        return {
+            "primary": p.name if p else None,
+            "fallback": f.name if f else None,
+            "fallback_calls": _fallback_calls,
+            "primary_paused": time.monotonic() < _paused_until,
+            "last_fallback_reason": _last_reason,
+        }
+
+
+class FallbackBackend:
+    """Tries the first provider; on `ProviderDown` asks the second one for the same model.
+
+    `model` stays the first provider's name: it keys the caches and labels the stored vectors,
+    and the fallback serves the same weights, so a provider outage does not make every cache cold.
+    """
+
+    def __init__(self, primary: Backend, secondary: Backend) -> None:
+        self.primary = primary
+        self.secondary = secondary
+        self.model = primary.model
+
+    def structured(
+        self, *, system: str, user: str, schema: type[BaseModel], effort: str, max_tokens: int, images: list[str] | None = None
+    ) -> BaseModel:
+        kwargs = dict(system=system, user=user, schema=schema, effort=effort, max_tokens=max_tokens, images=images)
+        if primary_paused():
+            count_fallback()
+            return self.secondary.structured(**kwargs)
+        try:
+            return self.primary.structured(**kwargs)
+        except ProviderDown as exc:
+            note_fallback(exc, "this call")
+            return self.secondary.structured(**kwargs)
+
+
 def make_client(model: str | None = None, json_mode: str = "schema") -> Backend | None:
     """A backend when credentials exist, else None.
 
@@ -171,7 +286,12 @@ def make_client(model: str | None = None, json_mode: str = "schema") -> Backend 
         return AnthropicBackend(settings.llm_api_key or "", model)
     if not p.base_url or not model:
         return None
-    return OpenAIBackend(settings.llm_api_key or "", p.base_url, model, p.name, json_mode=json_mode)
+    primary = OpenAIBackend(settings.llm_api_key or "", p.base_url, model, p.name, json_mode=json_mode)
+    f = resolve_fallback(p)
+    if f is None or not f.base_url:
+        return primary
+    secondary = OpenAIBackend(settings.llm_fallback_api_key or "", f.base_url, fallback_model(model, f.name), f.name, json_mode=json_mode)
+    return FallbackBackend(primary, secondary)
 
 
 class AnthropicBackend:
@@ -290,11 +410,15 @@ class OpenAIBackend:
         try:
             response = self._http.post(self._url, json=body)
         except httpx.HTTPError as exc:
-            raise ModelUnavailable(f"the model call failed: {exc.__class__.__name__}") from exc
+            raise ProviderDown(f"the model call failed: {exc.__class__.__name__}") from exc
         if response.status_code in (401, 403):
-            raise ModelUnavailable("the API key was rejected")
+            raise ProviderDown("the API key was rejected", sticky=True)
         if response.status_code == 429:
-            raise ModelUnavailable("the model is rate limited; try again in a minute")
+            raise ProviderDown("the model is rate limited; try again in a minute")
+        if response.status_code == 402:  # no credit left on the account
+            raise ProviderDown(f"the model call failed: HTTP 402 {response.text[:120]}", sticky=True)
+        if response.status_code in (404, 408) or response.status_code >= 500:
+            raise ProviderDown(f"the model call failed: HTTP {response.status_code} {response.text[:120]}")
         if response.status_code >= 400:
             raise ModelUnavailable(f"the model call failed: HTTP {response.status_code} {response.text[:120]}")
         try:

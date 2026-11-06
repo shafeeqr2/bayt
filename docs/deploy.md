@@ -46,6 +46,18 @@ Differences from `./start.sh` on your machine:
 
 The code lives in `/opt/bayt`, owned by the `deploy` user.
 `/opt/bayt/.env` holds the settings and the model key. It is not in git.
+
+## Fallback model provider
+
+Every model call goes to Nebius Token Factory first (`LLM_API_KEY`). On 2026-11-01 the Token Factory account ran out of credit and every model feature went dark at once. Since then an optional second key, `LLM_FALLBACK_API_KEY` (an OpenRouter key, `sk-or-...`), lets the same open models answer through OpenRouter when Token Factory refuses or fails:
+
+- It is used only after a provider-level failure: HTTP 402 (no credit), 401/403 (key rejected), 429, 404, 408, 5xx, or a dropped connection. A bad model answer (wrong JSON, out of tokens) does not go to the fallback.
+- After a 402 or a rejected key the backend skips Token Factory for 10 minutes, then tries it again.
+- The model name in the caches and next to the stored vectors stays the Token Factory name, and the fallback asks for the same model in OpenRouter's lower-case naming (`nvidia/nemotron-3.5-super-vl`, `nvidia/nemotron-3-super-120b-a12b`, `qwen/qwen3-embedding-8b`), so caches stay warm and nothing is re-embedded.
+- `GET /api/health` shows it: `model_provider: {primary, fallback, fallback_calls, primary_paused, last_fallback_reason}`. `fallback_calls` counts since the last backend start.
+- Fallback calls count against the same spend guards.
+
+Without `LLM_FALLBACK_API_KEY` nothing changes: a Token Factory failure degrades to the deterministic answers, as before.
 It also sets `COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml`, so a plain `docker compose` command in `/opt/bayt` uses the production files.
 
 ## How the server was set up
